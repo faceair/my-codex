@@ -1,0 +1,34 @@
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+personality = "pragmatic"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+[features]
+multi_agent = true
+js_repl = true
+
+[agents]
+max_threads = 1024
+
+[agents.explorer]
+config_file = "~/.codex/agents/explorer.toml"
+
+[agents.worker]
+config_file = "~/.codex/agents/worker.toml"
+
+[agents.reviewer]
+description = """
+Risk-focused reviewer for architecture, security, correctness, and performance.
+
+Use by default when:
+- The user asks for a review/audit.
+- Changes touch concurrency, auth/permissions, input handling, resource limits, or multiple components.
+- The issue is production-facing/high-cost, or there were 2+ failed fix attempts.
+
+Skip for:
+- Formatting-only or docs-only changes.
+- Isolated low-risk single-file tweaks.
+
+Output must include prioritized findings, file/line refs, likely impact/fix direction, and test gaps."""
+config_file = "~/.codex/agents/reviewer.toml"
