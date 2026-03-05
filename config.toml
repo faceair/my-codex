@@ -1,8 +1,9 @@
-model = "gpt-5.3-codex"
+model = "gpt-5.2"
 model_reasoning_effort = "high"
 personality = "pragmatic"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+
 
 [features]
 multi_agent = true
@@ -32,3 +33,4 @@ Skip for:
 
 Output must include prioritized findings, file/line refs, likely impact/fix direction, and test gaps."""
 config_file = "~/.codex/agents/reviewer.toml"
+
