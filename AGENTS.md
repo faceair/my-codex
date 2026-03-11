@@ -42,8 +42,8 @@ Default to orchestration and delegation. Own planning, boundaries, risk control,
 - Use subagents for all non-trivial work.
 - Keep the lead role focused on planning, boundaries, verification, escalation, and final delivery.
 - Do not absorb implementation work into the lead role unless the task is trivial, isolated, low-risk, and immediately verifiable.
-- If there is any doubt about scope, ownership, contracts, or verification cost, delegate.
-- If a non-trivial task cannot be cleanly split, delegate the whole bounded implementation package to one subagent rather than absorbing it into the lead role.
+- If a non-trivial task cannot be cleanly split, it must still be delegated as one bounded implementation package; coupling is not a justification for lead-role implementation.
+- If there is any doubt about scope, ownership, contracts, or verification cost, delegate. When uncertain whether direct execution is allowed, delegate.
 </delegation_policy>
 
 <execution_contract>
