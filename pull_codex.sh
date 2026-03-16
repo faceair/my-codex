@@ -199,8 +199,9 @@ fi
 src_agents="${SRC_REPO_DIR}/agents"
 src_agents_md="${SRC_REPO_DIR}/AGENTS.md"
 src_config="${SRC_REPO_DIR}/config.toml"
+src_prompts="${SRC_REPO_DIR}/prompts"
 
-for required_path in "${src_agents}" "${src_agents_md}" "${src_config}"; do
+for required_path in "${src_agents}" "${src_agents_md}" "${src_config}" "${src_prompts}"; do
   if [[ ! -e "${required_path}" ]]; then
     echo "Missing required path in repository: ${required_path}" >&2
     exit 1
@@ -209,6 +210,8 @@ done
 
 rm -rf "${DEST_ROOT}/agents"
 cp -a "${src_agents}" "${DEST_ROOT}/agents"
+rm -rf "${DEST_ROOT}/prompts"
+cp -a "${src_prompts}" "${DEST_ROOT}/prompts"
 cp -f "${src_agents_md}" "${DEST_ROOT}/AGENTS.md"
 cp -f "${src_config}" "${dest_config}"
 
@@ -269,5 +272,6 @@ mv "${merged_config_file}" "${dest_config}"
 echo "Pulled from: ${REPO_URL}"
 echo "Updated:"
 echo "  - ${DEST_ROOT}/agents"
+echo "  - ${DEST_ROOT}/prompts"
 echo "  - ${DEST_ROOT}/AGENTS.md"
 echo "  - ${DEST_ROOT}/config.toml (kept local model_provider-related entries)"

@@ -7,10 +7,12 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SRC_AGENTS="${SRC_ROOT}/agents"
 SRC_AGENTS_MD="${SRC_ROOT}/AGENTS.md"
 SRC_CONFIG="${SRC_ROOT}/config.toml"
+SRC_PROMPTS="${SRC_ROOT}/prompts"
 
 DST_AGENTS="${REPO_ROOT}/agents"
 DST_AGENTS_MD="${REPO_ROOT}/AGENTS.md"
 DST_CONFIG="${REPO_ROOT}/config.toml"
+DST_PROMPTS="${REPO_ROOT}/prompts"
 
 cleanup_files=()
 cleanup() {
@@ -33,7 +35,7 @@ if ! command -v codex >/dev/null 2>&1; then
   exit 1
 fi
 
-for required in "${SRC_AGENTS}" "${SRC_AGENTS_MD}" "${SRC_CONFIG}"; do
+for required in "${SRC_AGENTS}" "${SRC_AGENTS_MD}" "${SRC_CONFIG}" "${SRC_PROMPTS}"; do
   if [[ ! -e "${required}" ]]; then
     echo "Missing source path: ${required}" >&2
     exit 1
@@ -43,6 +45,8 @@ done
 # Keep destination agents directory fully in sync with source.
 rm -rf "${DST_AGENTS}"
 cp -a "${SRC_AGENTS}" "${DST_AGENTS}"
+rm -rf "${DST_PROMPTS}"
+cp -a "${SRC_PROMPTS}" "${DST_PROMPTS}"
 
 cp -f "${SRC_AGENTS_MD}" "${DST_AGENTS_MD}"
 cp -f "${SRC_CONFIG}" "${DST_CONFIG}"
@@ -101,45 +105,80 @@ awk '
 mv "${tmp_file}" "${DST_CONFIG}"
 
 cd "${REPO_ROOT}"
-git add -- agents AGENTS.md config.toml
+git add -- agents prompts AGENTS.md config.toml
 
-if git diff --cached --quiet -- agents AGENTS.md config.toml; then
+if git diff --cached --quiet -- agents prompts AGENTS.md config.toml; then
   echo "Synced to: ${REPO_ROOT}"
   echo "No changes in sync targets. Skip commit and push."
   exit 0
 fi
 
 diff_file="$(mktemp)"
-message_file="$(mktemp)"
-cleanup_files+=("${diff_file}" "${message_file}")
+raw_message_file="$(mktemp)"
+commit_message_file="$(mktemp)"
+cleanup_files+=("${diff_file}" "${raw_message_file}" "${commit_message_file}")
 
-git diff --cached -- agents AGENTS.md config.toml > "${diff_file}"
+git diff --cached -- agents prompts AGENTS.md config.toml > "${diff_file}"
+
+smart_commit_prompt_file="${DST_PROMPTS}/smart-commit.md"
+if [[ ! -f "${smart_commit_prompt_file}" ]]; then
+  echo "Missing smart commit prompt: ${smart_commit_prompt_file}" >&2
+  exit 1
+fi
 
 {
-  echo "Write a concise English git commit subject line for the staged diff."
-  echo "Rules:"
-  echo "- Output exactly one line."
-  echo "- Use imperative mood."
-  echo "- Maximum 72 characters."
-  echo "- Do not include quotes, markdown, or explanation."
+  cat "${smart_commit_prompt_file}"
+  echo
+  echo "Automation-specific overrides:"
+  echo "- Do not run git status, git diff, git add, git commit, or git push."
+  echo "- The staged diff is provided below, so do not ask for more input."
+  echo "- Output only the git commit message text."
+  echo "- The first line must be the summary line."
+  echo "- If a body is needed, separate it from the summary with a blank line."
+  echo "- Do not include code fences, quotes, markdown, or explanations."
   echo
   echo "Staged diff:"
   cat "${diff_file}"
-} | codex exec --color never -o "${message_file}" -
+} | codex exec --color never -o "${raw_message_file}" -
 
-commit_message="$(awk 'NF {gsub(/\r/, "", $0); print; exit}' "${message_file}")"
+awk '
+  {
+    gsub(/\r/, "", $0)
+    lines[++count] = $0
+  }
+
+  END {
+    start = 1
+    while (start <= count && lines[start] ~ /^[[:space:]]*$/) {
+      start++
+    }
+
+    end = count
+    while (end >= start && lines[end] ~ /^[[:space:]]*$/) {
+      end--
+    }
+
+    for (i = start; i <= end; i++) {
+      print lines[i]
+    }
+  }
+' "${raw_message_file}" > "${commit_message_file}"
+
+commit_message="$(awk 'NF {print; exit}' "${commit_message_file}")"
 
 if [[ -z "${commit_message}" ]]; then
   echo "Failed to generate commit message from codex output." >&2
   exit 1
 fi
 
-git commit -m "${commit_message}"
+git commit -F "${commit_message_file}"
 git push
 
 echo "Synced to: ${REPO_ROOT}"
 echo "Updated files:"
 echo "  - ${DST_AGENTS}"
+echo "  - ${DST_PROMPTS}"
 echo "  - ${DST_AGENTS_MD}"
 echo "  - ${DST_CONFIG} (model_provider-related entries removed)"
-echo "Committed and pushed with message: ${commit_message}"
+echo "Committed and pushed with message:"
+cat "${commit_message_file}"
