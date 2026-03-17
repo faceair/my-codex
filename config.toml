@@ -53,6 +53,8 @@ config_file = "~/.codex/agents/reviewer.toml"
 [projects."/Users/faceair"]
 trust_level = "trusted"
 
-[mcp_servers.bb-browser]
-command = "npx"
-args = ["-y", "bb-browser", "--mcp"]
+[projects."/Users/faceair/Developer/smart-commit"]
+trust_level = "trusted"
+
+[projects."/Users/faceair/Developer/spark"]
+trust_level = "trusted"
