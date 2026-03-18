@@ -205,12 +205,11 @@ if ! git clone --depth 1 "${REPO_URL}" "${SRC_REPO_DIR}" >"${clone_log_file}" 2>
 fi
 
 src_agents="${SRC_REPO_DIR}/agents"
-src_agents_md="${SRC_REPO_DIR}/AGENTS.md"
 src_config="${SRC_REPO_DIR}/config.toml"
 src_prompts="${SRC_REPO_DIR}/prompts"
 src_instructions="${SRC_REPO_DIR}/instructions"
 
-for required_path in "${src_agents}" "${src_agents_md}" "${src_config}" "${src_prompts}"; do
+for required_path in "${src_agents}" "${src_config}" "${src_prompts}"; do
   if [[ ! -e "${required_path}" ]]; then
     echo "Missing required path in repository: ${required_path}" >&2
     exit 1
@@ -227,7 +226,6 @@ if [[ -d "${src_instructions}" ]]; then
 else
   rm -rf "${DEST_ROOT}/instructions"
 fi
-cp -f "${src_agents_md}" "${DEST_ROOT}/AGENTS.md"
 cp -f "${src_config}" "${dest_config}"
 
 cleaned_config_file="$(mktemp)"
@@ -289,5 +287,4 @@ echo "Updated:"
 echo "  - ${DEST_ROOT}/agents"
 echo "  - ${DEST_ROOT}/prompts"
 echo "  - ${DEST_ROOT}/instructions (synced when repository path exists, removed when absent)"
-echo "  - ${DEST_ROOT}/AGENTS.md"
 echo "  - ${DEST_ROOT}/config.toml (kept local model_provider/projects-related entries)"

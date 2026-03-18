@@ -8,7 +8,6 @@
 - `agents/`
 - `prompts/`
 - `instructions/`（可选目录：源目录存在则同步，不存在则删除目标目录）
-- `AGENTS.md`
 - `config.toml`（`pull_codex.sh` 会保留本地 `model_provider` 与 `projects` 信任相关配置；`sync_codex.sh` 不会同步 `projects` 信任配置到仓库）
 
 `sync_codex.sh` 在生成 commit message 时，会复用同步进仓库的 `prompts/smart-commit.md` 作为提示词，再由脚本自身执行 `git commit` 和 `git push`。

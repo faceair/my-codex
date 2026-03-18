@@ -5,13 +5,11 @@ SRC_ROOT="${HOME}/.codex"
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 SRC_AGENTS="${SRC_ROOT}/agents"
-SRC_AGENTS_MD="${SRC_ROOT}/AGENTS.md"
 SRC_CONFIG="${SRC_ROOT}/config.toml"
 SRC_PROMPTS="${SRC_ROOT}/prompts"
 SRC_INSTRUCTIONS="${SRC_ROOT}/instructions"
 
 DST_AGENTS="${REPO_ROOT}/agents"
-DST_AGENTS_MD="${REPO_ROOT}/AGENTS.md"
 DST_CONFIG="${REPO_ROOT}/config.toml"
 DST_PROMPTS="${REPO_ROOT}/prompts"
 DST_INSTRUCTIONS="${REPO_ROOT}/instructions"
@@ -37,7 +35,7 @@ if ! command -v codex >/dev/null 2>&1; then
   exit 1
 fi
 
-for required in "${SRC_AGENTS}" "${SRC_AGENTS_MD}" "${SRC_CONFIG}" "${SRC_PROMPTS}"; do
+for required in "${SRC_AGENTS}" "${SRC_CONFIG}" "${SRC_PROMPTS}"; do
   if [[ ! -e "${required}" ]]; then
     echo "Missing source path: ${required}" >&2
     exit 1
@@ -56,7 +54,6 @@ else
   rm -rf "${DST_INSTRUCTIONS}"
 fi
 
-cp -f "${SRC_AGENTS_MD}" "${DST_AGENTS_MD}"
 cp -f "${SRC_CONFIG}" "${DST_CONFIG}"
 
 tmp_file="$(mktemp)"
@@ -117,9 +114,9 @@ awk '
 mv "${tmp_file}" "${DST_CONFIG}"
 
 cd "${REPO_ROOT}"
-git add -- agents prompts instructions AGENTS.md config.toml
+git add -- agents prompts instructions config.toml
 
-if git diff --cached --quiet -- agents prompts instructions AGENTS.md config.toml; then
+if git diff --cached --quiet -- agents prompts instructions config.toml; then
   echo "Synced to: ${REPO_ROOT}"
   echo "No changes in sync targets. Skip commit and push."
   exit 0
@@ -130,7 +127,7 @@ raw_message_file="$(mktemp)"
 commit_message_file="$(mktemp)"
 cleanup_files+=("${diff_file}" "${raw_message_file}" "${commit_message_file}")
 
-git diff --cached -- agents prompts instructions AGENTS.md config.toml > "${diff_file}"
+git diff --cached -- agents prompts instructions config.toml > "${diff_file}"
 
 smart_commit_prompt_file="${DST_PROMPTS}/smart-commit.md"
 if [[ ! -f "${smart_commit_prompt_file}" ]]; then
@@ -191,7 +188,6 @@ echo "Updated files:"
 echo "  - ${DST_AGENTS}"
 echo "  - ${DST_PROMPTS}"
 echo "  - ${DST_INSTRUCTIONS} (synced when source exists, removed when absent)"
-echo "  - ${DST_AGENTS_MD}"
 echo "  - ${DST_CONFIG} (model_provider/projects-related entries removed)"
 echo "Committed and pushed with message:"
 cat "${commit_message_file}"
