@@ -3,6 +3,7 @@ model_reasoning_effort = "high"
 personality = "pragmatic"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+model_instructions_file = "instructions/leader.md"
 
 [features]
 multi_agent = true
@@ -13,11 +14,11 @@ max_depth = 1
 max_threads = 32
 
 [agents.explorer]
-config_file = "~/.codex/agents/explorer.toml"
+config_file = "agents/explorer.toml"
 
 [agents.worker]
-config_file = "~/.codex/agents/worker.toml"
+config_file = "agents/worker.toml"
 
 [agents.reviewer]
-config_file = "~/.codex/agents/reviewer.toml"
+config_file = "agents/reviewer.toml"
 

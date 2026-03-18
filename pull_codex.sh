@@ -48,7 +48,7 @@ extract_provider_root_keys() {
 
     /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
       sec = section_name($0)
-      if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/) {
+      if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/ || sec ~ /^projects(\.|$)/) {
         in_provider_section = 1
       } else {
         in_provider_section = 0
@@ -62,11 +62,15 @@ extract_provider_root_keys() {
       }
 
       line = $0
+      if (line ~ /^[[:space:]]*projects[[:space:]]*=/) {
+        print line
+      }
+
       if (line ~ /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/) {
         key = line
         sub(/=.*/, "", key)
         key = trim(key)
-        if (key ~ /^model_provider([._-].*|$)/ || key ~ /^model_providers([._-].*|$)/) {
+        if (key ~ /^model_provider([._-].*|$)/ || key ~ /^model_providers([._-].*|$)/ || key ~ /^projects([._-].*|$)/) {
           print line
         }
       }
@@ -96,7 +100,7 @@ extract_provider_sections() {
 
     /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
       sec = section_name($0)
-      if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/) {
+      if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/ || sec ~ /^projects(\.|$)/) {
         keep_section = 1
         print
         next
@@ -135,7 +139,7 @@ strip_provider_blocks() {
 
     /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
       sec = section_name($0)
-      if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/) {
+      if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/ || sec ~ /^projects(\.|$)/) {
         skip_section = 1
         next
       }
@@ -150,11 +154,15 @@ strip_provider_blocks() {
       }
 
       line = $0
+      if (line ~ /^[[:space:]]*projects[[:space:]]*=/) {
+        next
+      }
+
       if (line ~ /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/) {
         key = line
         sub(/=.*/, "", key)
         key = trim(key)
-        if (key ~ /^model_provider([._-].*|$)/ || key ~ /^model_providers([._-].*|$)/) {
+        if (key ~ /^model_provider([._-].*|$)/ || key ~ /^model_providers([._-].*|$)/ || key ~ /^projects([._-].*|$)/) {
           next
         }
       }
@@ -200,6 +208,7 @@ src_agents="${SRC_REPO_DIR}/agents"
 src_agents_md="${SRC_REPO_DIR}/AGENTS.md"
 src_config="${SRC_REPO_DIR}/config.toml"
 src_prompts="${SRC_REPO_DIR}/prompts"
+src_instructions="${SRC_REPO_DIR}/instructions"
 
 for required_path in "${src_agents}" "${src_agents_md}" "${src_config}" "${src_prompts}"; do
   if [[ ! -e "${required_path}" ]]; then
@@ -212,6 +221,12 @@ rm -rf "${DEST_ROOT}/agents"
 cp -a "${src_agents}" "${DEST_ROOT}/agents"
 rm -rf "${DEST_ROOT}/prompts"
 cp -a "${src_prompts}" "${DEST_ROOT}/prompts"
+if [[ -d "${src_instructions}" ]]; then
+  rm -rf "${DEST_ROOT}/instructions"
+  cp -a "${src_instructions}" "${DEST_ROOT}/instructions"
+else
+  rm -rf "${DEST_ROOT}/instructions"
+fi
 cp -f "${src_agents_md}" "${DEST_ROOT}/AGENTS.md"
 cp -f "${src_config}" "${dest_config}"
 
@@ -273,5 +288,6 @@ echo "Pulled from: ${REPO_URL}"
 echo "Updated:"
 echo "  - ${DEST_ROOT}/agents"
 echo "  - ${DEST_ROOT}/prompts"
+echo "  - ${DEST_ROOT}/instructions (synced when repository path exists, removed when absent)"
 echo "  - ${DEST_ROOT}/AGENTS.md"
-echo "  - ${DEST_ROOT}/config.toml (kept local model_provider-related entries)"
+echo "  - ${DEST_ROOT}/config.toml (kept local model_provider/projects-related entries)"

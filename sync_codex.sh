@@ -8,11 +8,13 @@ SRC_AGENTS="${SRC_ROOT}/agents"
 SRC_AGENTS_MD="${SRC_ROOT}/AGENTS.md"
 SRC_CONFIG="${SRC_ROOT}/config.toml"
 SRC_PROMPTS="${SRC_ROOT}/prompts"
+SRC_INSTRUCTIONS="${SRC_ROOT}/instructions"
 
 DST_AGENTS="${REPO_ROOT}/agents"
 DST_AGENTS_MD="${REPO_ROOT}/AGENTS.md"
 DST_CONFIG="${REPO_ROOT}/config.toml"
 DST_PROMPTS="${REPO_ROOT}/prompts"
+DST_INSTRUCTIONS="${REPO_ROOT}/instructions"
 
 cleanup_files=()
 cleanup() {
@@ -47,6 +49,12 @@ rm -rf "${DST_AGENTS}"
 cp -a "${SRC_AGENTS}" "${DST_AGENTS}"
 rm -rf "${DST_PROMPTS}"
 cp -a "${SRC_PROMPTS}" "${DST_PROMPTS}"
+if [[ -d "${SRC_INSTRUCTIONS}" ]]; then
+  rm -rf "${DST_INSTRUCTIONS}"
+  cp -a "${SRC_INSTRUCTIONS}" "${DST_INSTRUCTIONS}"
+else
+  rm -rf "${DST_INSTRUCTIONS}"
+fi
 
 cp -f "${SRC_AGENTS_MD}" "${DST_AGENTS_MD}"
 cp -f "${SRC_CONFIG}" "${DST_CONFIG}"
@@ -74,7 +82,7 @@ awk '
 
   /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
     sec = section_name($0)
-    if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/) {
+    if (sec ~ /^model_provider(\.|$)/ || sec ~ /^model_providers(\.|$)/ || sec ~ /^projects(\.|$)/) {
       skip_section = 1
       next
     }
@@ -89,11 +97,15 @@ awk '
     }
 
     line = $0
+    if (line ~ /^[[:space:]]*projects[[:space:]]*=/) {
+      next
+    }
+
     if (line ~ /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/) {
       key = line
       sub(/=.*/, "", key)
       key = trim(key)
-      if (key ~ /^model_provider([._-].*|$)/ || key ~ /^model_providers([._-].*|$)/) {
+      if (key ~ /^model_provider([._-].*|$)/ || key ~ /^model_providers([._-].*|$)/ || key ~ /^projects([._-].*|$)/) {
         next
       }
     }
@@ -105,9 +117,9 @@ awk '
 mv "${tmp_file}" "${DST_CONFIG}"
 
 cd "${REPO_ROOT}"
-git add -- agents prompts AGENTS.md config.toml
+git add -- agents prompts instructions AGENTS.md config.toml
 
-if git diff --cached --quiet -- agents prompts AGENTS.md config.toml; then
+if git diff --cached --quiet -- agents prompts instructions AGENTS.md config.toml; then
   echo "Synced to: ${REPO_ROOT}"
   echo "No changes in sync targets. Skip commit and push."
   exit 0
@@ -118,7 +130,7 @@ raw_message_file="$(mktemp)"
 commit_message_file="$(mktemp)"
 cleanup_files+=("${diff_file}" "${raw_message_file}" "${commit_message_file}")
 
-git diff --cached -- agents prompts AGENTS.md config.toml > "${diff_file}"
+git diff --cached -- agents prompts instructions AGENTS.md config.toml > "${diff_file}"
 
 smart_commit_prompt_file="${DST_PROMPTS}/smart-commit.md"
 if [[ ! -f "${smart_commit_prompt_file}" ]]; then
@@ -178,7 +190,8 @@ echo "Synced to: ${REPO_ROOT}"
 echo "Updated files:"
 echo "  - ${DST_AGENTS}"
 echo "  - ${DST_PROMPTS}"
+echo "  - ${DST_INSTRUCTIONS} (synced when source exists, removed when absent)"
 echo "  - ${DST_AGENTS_MD}"
-echo "  - ${DST_CONFIG} (model_provider-related entries removed)"
+echo "  - ${DST_CONFIG} (model_provider/projects-related entries removed)"
 echo "Committed and pushed with message:"
 cat "${commit_message_file}"
