@@ -9,52 +9,15 @@ multi_agent = true
 js_repl = true
 
 [agents]
-max_threads = 64
+max_depth = 1
+max_threads = 32
 
 [agents.explorer]
-description = """
-Use `explorer` for specific codebase questions.
-Explorers are fast and authoritative.
-They must be used to ask specific, well-scoped questions on the codebase.
-Rules:
-- In order to avoid redundant work, you should avoid exploring the same problem that explorers have already covered. Typically, you should trust the explorer results without additional verification. You are still allowed to inspect the code yourself to gain the needed context!
-- You are encouraged to spawn up multiple explorers in parallel when you have multiple distinct questions to ask about the codebase that can be answered independently. This allows you to get more information faster without waiting for one question to finish before asking the next. While waiting for the explorer results, you can continue working on other local tasks that do not depend on those results. This parallelism is a key advantage of delegation, so use it whenever you have multiple questions to ask.
-- Reuse existing explorers for related questions."""
 config_file = "~/.codex/agents/explorer.toml"
 
 [agents.worker]
-description = """
-Use for execution and production work.
-Typical tasks:
-- Implement part of a feature
-- Fix tests or bugs
-- Split large refactors into independent chunks
-Rules:
-- Explicitly assign **ownership** of the task (files / responsibility). When the subtask involves code changes, you should clearly specify which files or modules the worker is responsible for. This helps avoid merge conflicts and ensures accountability. For example, you can say "Worker 1 is responsible for updating the authentication module, while Worker 2 will handle the database layer." By defining clear ownership, you can delegate more effectively and reduce coordination overhead.
-- Always tell workers they are **not alone in the codebase**, and they should not revert the edits made by others, and they should adjust their implementation to accommodate the changes made by others. This is important because there may be multiple workers making changes in parallel, and they need to be aware of each other's work to avoid conflicts and ensure a cohesive final product."""
 config_file = "~/.codex/agents/worker.toml"
 
 [agents.reviewer]
-description = """
-Use the reviewer agent when the primary coding agent needs high-signal technical judgment rather than broad exploration or direct implementation.
-
-Route to the reviewer agent for tasks such as:
-- comparing a small number of concrete implementation options and recommending one;
-- reviewing a proposed plan, patch, refactor, or architecture change for correctness, scope fit, maintainability, or hidden risk;
-- diagnosing trade-offs where the answer depends on technical judgment rather than more file reading;
-- checking whether a proposed change is overengineered, out of scope, inconsistent with existing patterns, or likely to create follow-on complexity;
-- identifying the most likely failure point, risk concentration, rollback concern, or verification gap in a design or code change.
-
-Do not use the reviewer agent for broad codebase exploration, exhaustive file discovery, or open-ended research. Use an explorer-style agent for tracing execution paths and gathering evidence, and use a worker agent for making changes, running commands, and carrying implementation through to completion.
-
-The reviewer agent should work from the evidence already gathered whenever possible. It should prefer one primary recommendation, stay tightly scoped to the current request, make assumptions explicit when needed, and avoid inventing facts, file paths, line numbers, or unsupported certainty. Its value is concise technical judgment: what to do, why that is the best next move, what risk matters most, and what would trigger escalation or reconsideration."""
 config_file = "~/.codex/agents/reviewer.toml"
 
-[projects."/Users/faceair"]
-trust_level = "trusted"
-
-[projects."/Users/faceair/Developer/smart-commit"]
-trust_level = "trusted"
-
-[projects."/Users/faceair/Developer/spark"]
-trust_level = "trusted"
