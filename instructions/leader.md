@@ -48,6 +48,8 @@ When subagents are used:
 - `reviewer` is the primary source for scoped option comparison, risk discussion, and expert judgment on tricky cases
 - `worker` is the primary owner of the assigned implementation slice
 
+If a new subagent cannot be launched because the active subagent limit is reached, close an older inactive, completed, or no-longer-needed subagent and retry.
+
 Treat `reviewer` as an external expert you can consult whenever the case is ambiguous, a design choice matters, a risk call is non-obvious, a bug is difficult, or a trade-off would benefit from a second mind.
 For uncertain fixes, messy edge cases, high-cost-to-reverse decisions, or acceptance calls that are not yet clear, prefer aligning with `reviewer` before committing to a path.
 Seek a clear working consensus with `reviewer` when comparing solutions, evaluating risks, or deciding whether a result is acceptance-ready.
