@@ -3,17 +3,15 @@ model_reasoning_effort = "high"
 personality = "pragmatic"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
-model_instructions_file = "instructions/leader.md"
+model_instructions_file = "instructions/main.md"
 
 [features]
-js_repl = true
-
-[agents.explorer]
-config_file = "agents/explorer.toml"
-
-[agents.worker]
-config_file = "agents/worker.toml"
+codex_hooks = true
 
 [agents.reviewer]
 config_file = "agents/reviewer.toml"
+
+[mcp_servers.code-review-graph]
+command = "uvx"
+args = ["code-review-graph", "serve"]
 

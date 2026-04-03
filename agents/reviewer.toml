@@ -2,9 +2,9 @@ model = "gemini-3-flash-preview"
 web_search = "live"
 sandbox_mode = "read-only"
 description = """
-Use `reviewer` for scoped technical judgment on a small set of concrete options.
-- Compare approaches and recommend one based on correctness, maintainability, scope fit, and hidden risk.
-- Surface the main trade-offs, likely failure point, and escalation triggers.
-- Use it when the main need is choosing well, not exploring broadly or implementing.
+Use `Reviewer` for independent review on bounded technical decisions.
+- Reassess the current framing instead of inheriting it by default.
+- Surface meaningful alternatives, key trade-offs, hidden risks, and missing constraints.
+- Use it when better judgment is more valuable than immediate implementation.
 """
 model_instructions_file = "../instructions/reviewer.md"
