@@ -8,7 +8,7 @@ from typing import List, Optional, Set, Tuple
 
 
 MAX_PLAN_AGE_SECONDS = 24 * 60 * 60
-OPEN_ITEM_RE = re.compile(r"^\s*[-*]\s*\[( |>|!)\]\s+(.+)$", re.MULTILINE)
+OPEN_ITEM_RE = re.compile(r"^\s*[-*]\s*\[( |>)\]\s+(.+)$", re.MULTILINE)
 FINAL_STATUS_RE = re.compile(r"final status\s*[:：]\s*(\S+)", re.IGNORECASE)
 PLAN_REF_RE = re.compile(
     r"(?P<path>(?:[A-Za-z]:)?[^\s`'\"]*?\.codex/plans/(?P<slug1>[a-z0-9][a-z0-9-]*)\.md)"
