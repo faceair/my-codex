@@ -35,5 +35,4 @@ Return exactly these sections, in this order:
 3. Trade-offs and judgment
 4. Recommended path
 5. What to verify before proceeding
-6. Effort
 </output_contract>
