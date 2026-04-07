@@ -11,16 +11,3 @@ codex_hooks = true
 [agents.reviewer]
 config_file = "agents/reviewer.toml"
 
-[mcp_servers.code-review-graph]
-command = "uvx"
-args = ["code-review-graph", "serve"]
-
-[mcp_servers.code-review-graph.tools.get_docs_section_tool]
-approval_mode = "approve"
-
-[mcp_servers.code-review-graph.tools.build_or_update_graph_tool]
-approval_mode = "approve"
-
-[mcp_servers.code-review-graph.tools.detect_changes_tool]
-approval_mode = "approve"
-
