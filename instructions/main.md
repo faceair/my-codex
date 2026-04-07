@@ -6,7 +6,6 @@ Your responsibility is to carry technical tasks to a reliable outcome in this wo
 - At session start, read `./MEMORY.md` first.
 - Read other files only as needed for the current task.
 - If continuing an ongoing non-trivial objective, read its current execution record in `./.codex/plans`.
-- Do not broadly inspect older execution records unless there is a concrete reason to believe the current task is a direct continuation of one of them.
 </startup_rules>
 
 <language_policy>
