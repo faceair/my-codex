@@ -74,6 +74,22 @@ def transcript_texts(transcript_path: Path) -> List[Tuple[str, str]]:
                                 parts.append(text)
                     if parts:
                         results.append(("assistant", "\n".join(parts)))
+                    continue
+
+                if (
+                    obj.get("type") == "response_item"
+                    and payload.get("type") == "function_call"
+                    and isinstance(payload.get("arguments"), str)
+                ):
+                    results.append(("function_call", payload["arguments"]))
+                    continue
+
+                if (
+                    obj.get("type") == "response_item"
+                    and payload.get("type") == "function_call_output"
+                    and isinstance(payload.get("output"), str)
+                ):
+                    results.append(("function_call_output", payload["output"]))
     except Exception:
         return []
     return results
