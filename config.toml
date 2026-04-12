@@ -11,3 +11,5 @@ codex_hooks = true
 [agents.reviewer]
 config_file = "agents/reviewer.toml"
 
+[notice]
+hide_rate_limit_model_nudge = true
