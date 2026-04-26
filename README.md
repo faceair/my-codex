@@ -1,26 +1,99 @@
 # my-codex
 
-用于在仓库与本地 `~/.codex` 之间同步配置：
-- `pull_codex.sh`：从 GitHub 拉取到本地 `~/.codex`，并保留本地 `model_provider` 与 `projects` 信任相关配置。
-- `sync_codex.sh`：从本地 `~/.codex` 同步回当前仓库。
+`my-codex` 现在是 Go 驱动的本地配置同步仓库：
+- `my-codex sync`：把本地 `~/.codex` 的 repo-managed 内容同步回当前仓库，并自动 commit/push
+- `my-codex pull`：把 release 内嵌的 repo-managed 内容下发到本地 `~/.codex`
+- `codex-stop-guard`：独立 Stop hook 二进制，负责在仍有未完成 plan 项时拦停
 
-当前会双向同步这些内容：
+## 当前同步边界
+
+双向同步这些内容：
 - `agents/`
 - `prompts/`
-- `instructions/`（可选目录：源目录存在则同步，不存在则删除目标目录）
-- `config.toml`（`pull_codex.sh` 会保留本地 `model_provider` 与 `projects` 信任相关配置；`sync_codex.sh` 不会同步 `projects` 信任配置到仓库）
+- `instructions/`
+- `hooks/`（目录级同步；现在用于承载 hook 二进制与清理遗留 Python hook 文件）
+- `hooks.json`（会在 repo 中保持 macOS 风格命令；pull 到本地时按本地平台改写）
+- `config.toml`（白名单同步，仅管理这些配置：`model_instructions_file`、`[features].codex_hooks`、`[agents.reviewer].config_file`）
 
-`sync_codex.sh` 在生成 commit message 时，会复用同步进仓库的 `prompts/smart-commit.md` 作为提示词，再由脚本自身执行 `git commit` 和 `git push`。
+不再同步：
+- `AGENTS.md`
+- 本地 `model_provider` / `projects` / 其他运行偏好
 
-## 快速运行 pull_codex.sh（一行命令）
+## 直接拉最新 release 并下发到本地
+
+### macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/faceair/my-codex/main/pull_codex.sh | bash
+tmp_dir="$(mktemp -d)"
+arch="$(uname -m)"
+case "$arch" in
+  arm64) asset="my-codex_darwin_arm64.tar.gz" ;;
+  x86_64) asset="my-codex_darwin_amd64.tar.gz" ;;
+  *) echo "unsupported arch: $arch" >&2; exit 1 ;;
+esac
+curl -fsSL -o "$tmp_dir/$asset" "https://github.com/faceair/my-codex/releases/latest/download/$asset"
+tar -xzf "$tmp_dir/$asset" -C "$tmp_dir"
+"$tmp_dir/my-codex" pull
+rm -rf "$tmp_dir"
 ```
 
-## 本地运行 sync_codex.sh
+### Windows PowerShell
+
+```powershell
+$TmpDir = Join-Path $env:TEMP ([guid]::NewGuid().ToString())
+New-Item -ItemType Directory -Path $TmpDir | Out-Null
+$Asset = "my-codex_windows_amd64.zip"
+Invoke-WebRequest -Uri "https://github.com/faceair/my-codex/releases/latest/download/$Asset" -OutFile (Join-Path $TmpDir $Asset)
+Expand-Archive -Path (Join-Path $TmpDir $Asset) -DestinationPath $TmpDir -Force
+& (Join-Path $TmpDir 'my-codex.exe') pull
+Remove-Item -Recurse -Force $TmpDir
+```
+
+`pull` 会：
+- 把 `codex-stop-guard` 安装到 `~/.codex/hooks/`（Windows 为 `.exe`）
+- 更新本地 `hooks.json` 指向正确的平台路径
+- 不保留临时下载的 `my-codex`
+
+## 安装 sync 工具到 `GOPATH/bin`
+
+如果你需要长期在 repo 里执行 `sync`，推荐安装到 `GOPATH/bin`：
 
 ```bash
-cd /Users/faceair/Developer/my-codex
-./sync_codex.sh
+go install github.com/faceair/my-codex/cmd/my-codex@latest
 ```
+
+安装后直接在 repo 里运行：
+
+```bash
+my-codex sync
+```
+
+仓库里的兼容壳也会遵循这个语义：
+- `./sync_codex.sh`
+- `sync_codex.cmd`
+
+如果当前 `PATH` 里没有 `my-codex`，它们会先执行本仓库源码版：
+
+```bash
+go install ./cmd/my-codex
+```
+
+然后再从 `GOBIN` / `GOPATH/bin` 运行 `my-codex sync`。
+
+如果你在当前仓库内开发，也可以：
+
+```bash
+go run ./cmd/my-codex sync
+```
+
+## 本地源码运行
+
+```bash
+go test ./...
+go run ./cmd/my-codex pull
+go run ./cmd/my-codex sync
+```
+
+如果从源码执行 `pull`，程序会优先：
+- 使用与 `my-codex` 同目录的 `codex-stop-guard`
+- 如果不存在，则尝试在当前 repo 内临时 `go build ./cmd/codex-stop-guard`

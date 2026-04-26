@@ -5,37 +5,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 \"$HOME/.codex/hooks/stop_continue_if_todo.py\"",
+            "command": "\"$HOME/.codex/hooks/codex-stop-guard\"",
             "timeout": 10,
             "statusMessage": "Checking unfinished plan items"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/faceair/.superset/hooks/notify.sh"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/faceair/.superset/hooks/notify.sh"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/faceair/.superset/hooks/notify.sh"
           }
         ]
       }
