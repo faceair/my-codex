@@ -21,6 +21,8 @@
 
 ## 直接拉最新 release 并下发到本地
 
+默认会使用 GitHub 上由 `main` 最新提交自动生成的滚动 release。
+
 ### macOS
 
 ```bash

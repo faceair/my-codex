@@ -21,6 +21,15 @@ func TestRunUnknownCommand(t *testing.T) {
 	}
 }
 
+func TestCleanOptionalPathPreservesEmptyString(t *testing.T) {
+	if got := cleanOptionalPath(""); got != "" {
+		t.Fatalf("expected empty optional path to stay empty, got %q", got)
+	}
+	if got := cleanOptionalPath("./tmp/foo"); got != filepath.Clean("./tmp/foo") {
+		t.Fatalf("expected non-empty path to be cleaned, got %q", got)
+	}
+}
+
 func TestRepoHookCommandUsesMacStylePath(t *testing.T) {
 	if got := RepoHookCommand(); got != "\"$HOME/.codex/hooks/codex-stop-guard\"" {
 		t.Fatalf("unexpected repo hook command: %s", got)

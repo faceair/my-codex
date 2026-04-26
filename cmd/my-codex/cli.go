@@ -57,11 +57,18 @@ func runPullCLI(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if err := runPull(PullOptions{DestRoot: filepath.Clean(*destRoot), HookBinaryPath: filepath.Clean(*hookBinary), Runner: ExecRunner{}, Platform: CurrentPlatform()}, stdout, stderr); err != nil {
+	if err := runPull(PullOptions{DestRoot: filepath.Clean(*destRoot), HookBinaryPath: cleanOptionalPath(*hookBinary), Runner: ExecRunner{}, Platform: CurrentPlatform()}, stdout, stderr); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Failed to pull codex with context: %v\n", err)
 		return 1
 	}
 	return 0
+}
+
+func cleanOptionalPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	return filepath.Clean(path)
 }
 
 func envOrDefault(key, fallback string) string {

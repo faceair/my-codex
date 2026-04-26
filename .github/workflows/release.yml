@@ -1,0 +1,68 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rolling-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build release bundles
+        run: |
+          set -eu
+          rm -rf dist
+          mkdir -p dist/darwin-amd64 dist/darwin-arm64 dist/windows-amd64
+          version="rolling-${GITHUB_SHA::7}"
+
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X main.version=${version}" -o dist/darwin-amd64/my-codex ./cmd/my-codex
+          GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o dist/darwin-amd64/codex-stop-guard ./cmd/codex-stop-guard
+          tar -C dist/darwin-amd64 -czf dist/my-codex_darwin_amd64.tar.gz my-codex codex-stop-guard
+
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w -X main.version=${version}" -o dist/darwin-arm64/my-codex ./cmd/my-codex
+          GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o dist/darwin-arm64/codex-stop-guard ./cmd/codex-stop-guard
+          tar -C dist/darwin-arm64 -czf dist/my-codex_darwin_arm64.tar.gz my-codex codex-stop-guard
+
+          GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X main.version=${version}" -o dist/windows-amd64/my-codex.exe ./cmd/my-codex
+          GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o dist/windows-amd64/codex-stop-guard.exe ./cmd/codex-stop-guard
+          cd dist/windows-amd64
+          zip -q ../my-codex_windows_amd64.zip my-codex.exe codex-stop-guard.exe
+          cd ../..
+
+          shasum -a 256 dist/my-codex_darwin_amd64.tar.gz dist/my-codex_darwin_arm64.tar.gz dist/my-codex_windows_amd64.zip > dist/checksums.txt
+
+      - name: Publish rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          tag="rolling"
+          gh release delete "$tag" --yes || true
+          git push origin ":refs/tags/$tag" || true
+          git tag -f "$tag" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$tag"
+          gh release create "$tag" \
+            dist/my-codex_darwin_amd64.tar.gz \
+            dist/my-codex_darwin_arm64.tar.gz \
+            dist/my-codex_windows_amd64.zip \
+            dist/checksums.txt \
+            --title "rolling" \
+            --notes "Auto-generated rolling release for commit $GITHUB_SHA"
