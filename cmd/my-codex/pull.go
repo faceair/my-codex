@@ -43,9 +43,6 @@ func runPull(options PullOptions, stdoutWriter, stderrWriter io.Writer) error {
 	if err := copyDirFromFS(options.ManagedAssetsFS, "instructions", filepath.Join(destRoot, "instructions")); err != nil {
 		return err
 	}
-	if err := copyDirFromFS(options.ManagedAssetsFS, "hooks", filepath.Join(destRoot, "hooks")); err != nil {
-		return err
-	}
 	installedHookPath := filepath.Join(destRoot, "hooks", options.Platform.HookBinaryFilename())
 	if err := os.MkdirAll(filepath.Dir(installedHookPath), 0o755); err != nil {
 		return fmt.Errorf("create hooks dir for %s: %w", installedHookPath, err)
@@ -64,7 +61,7 @@ func runPull(options PullOptions, stdoutWriter, stderrWriter io.Writer) error {
 	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(destRoot, "agents"))
 	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(destRoot, "prompts"))
 	fmt.Fprintf(stdoutWriter, "  - %s (synced from embedded release assets)\n", filepath.Join(destRoot, "instructions"))
-	fmt.Fprintf(stdoutWriter, "  - %s (legacy hook scripts replaced; hook binary installed here)\n", filepath.Join(destRoot, "hooks"))
+	fmt.Fprintf(stdoutWriter, "  - %s (created on demand for the managed hook binary; existing destination files are preserved)\n", filepath.Join(destRoot, "hooks"))
 	fmt.Fprintf(stdoutWriter, "  - %s (managed stop hook command adapted for local platform)\n", filepath.Join(destRoot, "hooks.json"))
 	fmt.Fprintf(stdoutWriter, "  - %s (repo-managed whitelist merged in; other local config preserved)\n", filepath.Join(destRoot, "config.toml"))
 	fmt.Fprintf(stdoutWriter, "  - %s\n", installedHookPath)
@@ -118,7 +115,11 @@ func pullManagedHooksJSON(sourceFS fs.FS, destination, installedHookPath string)
 	if err != nil {
 		return fmt.Errorf("read embedded hooks.json: %w", err)
 	}
-	adapted, err := adaptLocalHookJSON(raw, installedHookPath)
+	existingRaw, err := os.ReadFile(destination)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read existing local hooks.json %s: %w", destination, err)
+	}
+	adapted, err := mergeManagedHookJSON(raw, existingRaw, LocalHookCommand(installedHookPath))
 	if err != nil {
 		return err
 	}

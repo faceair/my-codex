@@ -54,9 +54,67 @@ func TestNormalizeRepoHookJSONRewritesLegacyPythonCommand(t *testing.T) {
 	if err := json.Unmarshal(normalized, &document); err != nil {
 		t.Fatalf("decode normalized hooks json: %v", err)
 	}
-	command := extractStopHookCommand(t, document)
+	command := extractManagedStopHookCommand(t, document)
 	if command != RepoHookCommand() {
 		t.Fatalf("expected repo hook command %q, got %q", RepoHookCommand(), command)
+	}
+}
+
+func TestMergeManagedHookJSONPreservesUnmanagedHooks(t *testing.T) {
+	source := []byte(`{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$HOME/.codex/hooks/stop_continue_if_todo.py\"",
+            "timeout": 10,
+            "statusMessage": "Checking unfinished plan items"
+          }
+        ]
+      }
+    ]
+  }
+}`)
+	target := []byte(`{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo pretool"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo keep-me"
+          }
+        ]
+      }
+    ]
+  }
+}`)
+	merged, err := mergeManagedHookJSON(source, target, RepoHookCommand())
+	if err != nil {
+		t.Fatalf("mergeManagedHookJSON returned error: %v", err)
+	}
+	var document map[string]any
+	if err := json.Unmarshal(merged, &document); err != nil {
+		t.Fatalf("decode merged hooks json: %v", err)
+	}
+	if command := extractManagedStopHookCommand(t, document); command != RepoHookCommand() {
+		t.Fatalf("expected merged managed hook command %q, got %q", RepoHookCommand(), command)
+	}
+	preToolUse := document["hooks"].(map[string]any)["PreToolUse"]
+	if preToolUse == nil {
+		t.Fatalf("expected unmanaged hook group PreToolUse to be preserved")
 	}
 }
 
@@ -69,6 +127,23 @@ func TestPullInstallsHookBinaryAndAdaptsHookJSON(t *testing.T) {
 	}
 	if err := os.WriteFile(legacyHook, []byte("print('legacy')\n"), 0o644); err != nil {
 		t.Fatalf("write legacy hook: %v", err)
+	}
+	existingHooksJSON := filepath.Join(destRoot, "hooks.json")
+	if err := os.WriteFile(existingHooksJSON, []byte(`{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo pretool"
+          }
+        ]
+      }
+    ]
+  }
+}`), 0o644); err != nil {
+		t.Fatalf("write existing hooks.json: %v", err)
 	}
 	hookBinary := filepath.Join(tempDir, platformHookBinaryName(runtime.GOOS))
 	if runtime.GOOS == "windows" {
@@ -89,8 +164,8 @@ func TestPullInstallsHookBinaryAndAdaptsHookJSON(t *testing.T) {
 	if _, err := os.Stat(installedHookPath); err != nil {
 		t.Fatalf("expected installed hook binary at %s: %v", installedHookPath, err)
 	}
-	if _, err := os.Stat(legacyHook); !os.IsNotExist(err) {
-		t.Fatalf("expected legacy hook to be removed, stat err=%v", err)
+	if _, err := os.Stat(legacyHook); err != nil {
+		t.Fatalf("expected legacy hook to be preserved, stat err=%v", err)
 	}
 	hooksJSON, err := os.ReadFile(filepath.Join(destRoot, "hooks.json"))
 	if err != nil {
@@ -100,8 +175,11 @@ func TestPullInstallsHookBinaryAndAdaptsHookJSON(t *testing.T) {
 	if err := json.Unmarshal(hooksJSON, &document); err != nil {
 		t.Fatalf("decode adapted hooks.json: %v", err)
 	}
-	if command := extractStopHookCommand(t, document); !strings.Contains(command, platformHookBinaryName(runtime.GOOS)) {
+	if command := extractManagedStopHookCommand(t, document); !strings.Contains(command, platformHookBinaryName(runtime.GOOS)) {
 		t.Fatalf("expected local hook command to contain installed hook binary, got %q", command)
+	}
+	if document["hooks"].(map[string]any)["PreToolUse"] == nil {
+		t.Fatalf("expected existing unmanaged hooks to be preserved")
 	}
 	config, err := readTOMLFile(filepath.Join(destRoot, "config.toml"))
 	if err != nil {
@@ -109,6 +187,42 @@ func TestPullInstallsHookBinaryAndAdaptsHookJSON(t *testing.T) {
 	}
 	if config["model_instructions_file"] != "instructions/main.md" {
 		t.Fatalf("unexpected pulled model_instructions_file: %#v", config["model_instructions_file"])
+	}
+}
+
+func TestPullPreservesExistingManagedDirectoriesFiles(t *testing.T) {
+	tempDir := t.TempDir()
+	destRoot := filepath.Join(tempDir, ".codex")
+	existingPrompt := filepath.Join(destRoot, "prompts", "legacy.md")
+	existingInstruction := filepath.Join(destRoot, "instructions", "legacy.md")
+	existingAgent := filepath.Join(destRoot, "agents", "legacy.toml")
+	for _, target := range []string{existingPrompt, existingInstruction, existingAgent} {
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			t.Fatalf("create parent dir for %s: %v", target, err)
+		}
+		if err := os.WriteFile(target, []byte("legacy\n"), 0o644); err != nil {
+			t.Fatalf("write legacy file %s: %v", target, err)
+		}
+	}
+	hookBinary := filepath.Join(tempDir, platformHookBinaryName(runtime.GOOS))
+	if runtime.GOOS == "windows" {
+		if err := os.WriteFile(hookBinary, []byte("@echo off\r\n"), 0o644); err != nil {
+			t.Fatalf("write fake hook binary: %v", err)
+		}
+	} else {
+		if err := os.WriteFile(hookBinary, []byte("#!/usr/bin/env sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatalf("write fake hook binary: %v", err)
+		}
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := runPull(PullOptions{DestRoot: destRoot, HookBinaryPath: hookBinary, Platform: CurrentPlatform(), ManagedAssetsFS: managedassets.FS}, &stdout, &stderr); err != nil {
+		t.Fatalf("runPull returned error: %v", err)
+	}
+	for _, target := range []string{existingPrompt, existingInstruction, existingAgent} {
+		if _, err := os.Stat(target); err != nil {
+			t.Fatalf("expected legacy file to be preserved at %s: %v", target, err)
+		}
 	}
 }
 
@@ -136,7 +250,7 @@ func TestPullOnWindowsUsesExeHookPath(t *testing.T) {
 	if err := json.Unmarshal(hooksJSON, &document); err != nil {
 		t.Fatalf("decode adapted hooks.json: %v", err)
 	}
-	command := extractStopHookCommand(t, document)
+	command := extractManagedStopHookCommand(t, document)
 	if !strings.Contains(command, "codex-stop-guard.exe") {
 		t.Fatalf("expected windows hook command to target .exe binary, got %q", command)
 	}
@@ -194,6 +308,24 @@ func extractStopHookCommand(t *testing.T, document map[string]any) string {
 	hookList := entry["hooks"].([]any)
 	hook := hookList[0].(map[string]any)
 	return hook["command"].(string)
+}
+
+func extractManagedStopHookCommand(t *testing.T, document map[string]any) string {
+	t.Helper()
+	hooks := document["hooks"].(map[string]any)
+	stop := hooks["Stop"].([]any)
+	for _, entryValue := range stop {
+		entry := entryValue.(map[string]any)
+		hookList := entry["hooks"].([]any)
+		for _, hookValue := range hookList {
+			hook := hookValue.(map[string]any)
+			if isManagedStopHook(hook) {
+				return hook["command"].(string)
+			}
+		}
+	}
+	t.Fatalf("managed stop hook command not found")
+	return ""
 }
 
 func platformHookBinaryName(goos string) string {

@@ -11,9 +11,6 @@ import (
 )
 
 func copyDirFromOS(source, destination string) error {
-	if err := os.RemoveAll(destination); err != nil {
-		return fmt.Errorf("remove destination dir %s: %w", destination, err)
-	}
 	if err := os.MkdirAll(destination, 0o755); err != nil {
 		return fmt.Errorf("create destination dir %s: %w", destination, err)
 	}
@@ -43,9 +40,6 @@ func copyDirFromOS(source, destination string) error {
 }
 
 func copyDirFromFS(sourceFS fs.FS, source, destination string) error {
-	if err := os.RemoveAll(destination); err != nil {
-		return fmt.Errorf("remove destination dir %s: %w", destination, err)
-	}
 	if err := os.MkdirAll(destination, 0o755); err != nil {
 		return fmt.Errorf("create destination dir %s: %w", destination, err)
 	}

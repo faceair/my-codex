@@ -54,9 +54,6 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 	if err := syncOptionalDir(filepath.Join(sourceRoot, "instructions"), filepath.Join(repoRoot, "instructions")); err != nil {
 		return err
 	}
-	if err := syncOptionalDir(filepath.Join(sourceRoot, "hooks"), filepath.Join(repoRoot, "hooks")); err != nil {
-		return err
-	}
 	if err := syncHooksJSONForRepo(filepath.Join(sourceRoot, "hooks.json"), filepath.Join(repoRoot, "hooks.json")); err != nil {
 		return err
 	}
@@ -64,7 +61,7 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 		return err
 	}
 	syncTargets := []string{"agents", "prompts", "instructions", "config.toml"}
-	for _, optionalTarget := range []string{"hooks", "hooks.json"} {
+	for _, optionalTarget := range []string{"hooks.json"} {
 		present, err := trackedOrPresent(repoRoot, optionalTarget, options.Runner)
 		if err != nil {
 			return err
@@ -102,8 +99,7 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 	fmt.Fprintln(stdoutWriter, "Updated files:")
 	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(repoRoot, "agents"))
 	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(repoRoot, "prompts"))
-	fmt.Fprintf(stdoutWriter, "  - %s (synced when source exists, removed when absent)\n", filepath.Join(repoRoot, "instructions"))
-	fmt.Fprintf(stdoutWriter, "  - %s (synced when source exists, removed when absent; legacy Python hook files are no longer required)\n", filepath.Join(repoRoot, "hooks"))
+	fmt.Fprintf(stdoutWriter, "  - %s (incremental sync when source exists; existing destination files are preserved)\n", filepath.Join(repoRoot, "instructions"))
 	fmt.Fprintf(stdoutWriter, "  - %s (managed stop hook command normalized to macOS-style repo path)\n", filepath.Join(repoRoot, "hooks.json"))
 	fmt.Fprintf(stdoutWriter, "  - %s (whitelist only: model_instructions_file, [features].codex_hooks, [agents.reviewer].config_file)\n", filepath.Join(repoRoot, "config.toml"))
 	fmt.Fprintln(stdoutWriter, "Committed and pushed with message:")
@@ -118,9 +114,6 @@ func syncOptionalDir(source, destination string) error {
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat optional dir %s: %w", source, err)
 	}
-	if err := os.RemoveAll(destination); err != nil {
-		return fmt.Errorf("remove optional dir %s: %w", destination, err)
-	}
 	return nil
 }
 
@@ -128,14 +121,15 @@ func syncHooksJSONForRepo(source, destination string) error {
 	raw, err := os.ReadFile(source)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if removeErr := os.Remove(destination); removeErr != nil && !os.IsNotExist(removeErr) {
-				return fmt.Errorf("remove repo hooks.json %s: %w", destination, removeErr)
-			}
 			return nil
 		}
 		return fmt.Errorf("read source hooks.json %s: %w", source, err)
 	}
-	normalized, err := normalizeRepoHookJSON(raw)
+	existingRaw, err := os.ReadFile(destination)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read existing repo hooks.json %s: %w", destination, err)
+	}
+	normalized, err := mergeManagedHookJSON(raw, existingRaw, RepoHookCommand())
 	if err != nil {
 		return err
 	}
