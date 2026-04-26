@@ -4,10 +4,10 @@
       {
         "hooks": [
           {
-            "type": "command",
             "command": "\"$HOME/.codex/hooks/codex-stop-guard\"",
+            "statusMessage": "Checking unfinished plan items",
             "timeout": 10,
-            "statusMessage": "Checking unfinished plan items"
+            "type": "command"
           }
         ]
       }

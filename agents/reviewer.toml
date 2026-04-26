@@ -1,4 +1,4 @@
-model = "gemini-3-flash-preview"
+model = "gemini-3-flash"
 web_search = "live"
 sandbox_mode = "read-only"
 description = """

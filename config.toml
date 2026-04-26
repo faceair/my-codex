@@ -1,7 +1,7 @@
 model_instructions_file = "instructions/main.md"
 
-[features]
-codex_hooks = true
-
 [agents.reviewer]
 config_file = "agents/reviewer.toml"
+
+[features]
+codex_hooks = true
