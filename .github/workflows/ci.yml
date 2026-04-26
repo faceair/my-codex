@@ -25,6 +25,18 @@ jobs:
         run: |
           go build ./cmd/my-codex
           go build ./cmd/codex-stop-guard
+          GOOS=darwin GOARCH=amd64 go build ./cmd/my-codex
+          GOOS=darwin GOARCH=arm64 go build ./cmd/my-codex
+          GOOS=linux GOARCH=amd64 go build ./cmd/my-codex
+          GOOS=linux GOARCH=arm64 go build ./cmd/my-codex
+          GOOS=windows GOARCH=amd64 go build ./cmd/my-codex
+          GOOS=windows GOARCH=arm64 go build ./cmd/my-codex
+          GOOS=darwin GOARCH=amd64 go build ./cmd/codex-stop-guard
+          GOOS=darwin GOARCH=arm64 go build ./cmd/codex-stop-guard
+          GOOS=linux GOARCH=amd64 go build ./cmd/codex-stop-guard
+          GOOS=linux GOARCH=arm64 go build ./cmd/codex-stop-guard
+          GOOS=windows GOARCH=amd64 go build ./cmd/codex-stop-guard
+          GOOS=windows GOARCH=arm64 go build ./cmd/codex-stop-guard
 
       - name: Run GoReleaser check
         uses: goreleaser/goreleaser-action@v6

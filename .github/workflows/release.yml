@@ -30,7 +30,13 @@ jobs:
         run: |
           set -eu
           rm -rf dist
-          mkdir -p dist/darwin-amd64 dist/darwin-arm64 dist/windows-amd64
+          mkdir -p \
+            dist/darwin-amd64 \
+            dist/darwin-arm64 \
+            dist/linux-amd64 \
+            dist/linux-arm64 \
+            dist/windows-amd64 \
+            dist/windows-arm64
           version="rolling-${GITHUB_SHA::7}"
 
           GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X main.version=${version}" -o dist/darwin-amd64/my-codex ./cmd/my-codex
@@ -41,13 +47,34 @@ jobs:
           GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o dist/darwin-arm64/codex-stop-guard ./cmd/codex-stop-guard
           tar -C dist/darwin-arm64 -czf dist/my-codex_darwin_arm64.tar.gz my-codex codex-stop-guard
 
+          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=${version}" -o dist/linux-amd64/my-codex ./cmd/my-codex
+          GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o dist/linux-amd64/codex-stop-guard ./cmd/codex-stop-guard
+          tar -C dist/linux-amd64 -czf dist/my-codex_linux_amd64.tar.gz my-codex codex-stop-guard
+
+          GOOS=linux GOARCH=arm64 go build -ldflags "-s -w -X main.version=${version}" -o dist/linux-arm64/my-codex ./cmd/my-codex
+          GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o dist/linux-arm64/codex-stop-guard ./cmd/codex-stop-guard
+          tar -C dist/linux-arm64 -czf dist/my-codex_linux_arm64.tar.gz my-codex codex-stop-guard
+
           GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X main.version=${version}" -o dist/windows-amd64/my-codex.exe ./cmd/my-codex
           GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o dist/windows-amd64/codex-stop-guard.exe ./cmd/codex-stop-guard
           cd dist/windows-amd64
           zip -q ../my-codex_windows_amd64.zip my-codex.exe codex-stop-guard.exe
           cd ../..
 
-          shasum -a 256 dist/my-codex_darwin_amd64.tar.gz dist/my-codex_darwin_arm64.tar.gz dist/my-codex_windows_amd64.zip > dist/checksums.txt
+          GOOS=windows GOARCH=arm64 go build -ldflags "-s -w -X main.version=${version}" -o dist/windows-arm64/my-codex.exe ./cmd/my-codex
+          GOOS=windows GOARCH=arm64 go build -ldflags "-s -w" -o dist/windows-arm64/codex-stop-guard.exe ./cmd/codex-stop-guard
+          cd dist/windows-arm64
+          zip -q ../my-codex_windows_arm64.zip my-codex.exe codex-stop-guard.exe
+          cd ../..
+
+          shasum -a 256 \
+            dist/my-codex_darwin_amd64.tar.gz \
+            dist/my-codex_darwin_arm64.tar.gz \
+            dist/my-codex_linux_amd64.tar.gz \
+            dist/my-codex_linux_arm64.tar.gz \
+            dist/my-codex_windows_amd64.zip \
+            dist/my-codex_windows_arm64.zip \
+            > dist/checksums.txt
 
       - name: Publish rolling release
         env:
@@ -62,7 +89,10 @@ jobs:
           gh release create "$tag" \
             dist/my-codex_darwin_amd64.tar.gz \
             dist/my-codex_darwin_arm64.tar.gz \
+            dist/my-codex_linux_amd64.tar.gz \
+            dist/my-codex_linux_arm64.tar.gz \
             dist/my-codex_windows_amd64.zip \
+            dist/my-codex_windows_arm64.zip \
             dist/checksums.txt \
             --title "rolling" \
             --notes "Auto-generated rolling release for commit $GITHUB_SHA"
