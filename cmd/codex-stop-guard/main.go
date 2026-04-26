@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,11 @@ import (
 	"time"
 )
 
-const maxPlanAge = 24 * time.Hour
+const (
+	maxPlanAge           = 24 * time.Hour
+	maxScannerTokenSize  = 2 * 1024 * 1024
+	reverseReadBlockSize = 64 * 1024
+)
 
 var (
 	openItemRE    = regexp.MustCompile(`(?m)^\s*[-*]\s*\[( |>)\]\s+(.+)$`)
@@ -71,11 +76,7 @@ func evaluateStopGuard(stdin io.Reader) (*stopGuardDecision, error) {
 	if err != nil || isSubagent {
 		return nil, nil
 	}
-	transcriptPlanPath, transcriptSlug, err := latestPlanRefFromTranscript(transcriptPath)
-	if err != nil || transcriptSlug == "" {
-		return nil, nil
-	}
-	activePlanPath, err := resolvePlanPath(filepath.Clean(payload.Cwd), transcriptPlanPath, transcriptSlug)
+	activePlanPath, err := latestResolvedPlanPathFromTranscript(filepath.Clean(payload.Cwd), transcriptPath)
 	if err != nil || activePlanPath == "" {
 		return nil, nil
 	}
@@ -108,7 +109,7 @@ func isSubagentSession(transcriptPath string) (bool, error) {
 		return false, err
 	}
 	defer file.Close()
-	scanner := bufio.NewScanner(file)
+	scanner := newScanner(file)
 	if !scanner.Scan() {
 		return false, scanner.Err()
 	}
@@ -122,93 +123,164 @@ func isSubagentSession(transcriptPath string) (bool, error) {
 	return exists, nil
 }
 
-func latestPlanRefFromTranscript(transcriptPath string) (string, string, error) {
-	texts, err := transcriptTexts(transcriptPath)
-	if err != nil {
-		return "", "", err
-	}
-	latestPath := ""
-	latestSlug := ""
-	for _, item := range texts {
-		matches := planRefRE.FindAllStringSubmatch(item.Text, -1)
-		names := planRefRE.SubexpNames()
-		for _, match := range matches {
-			values := map[string]string{}
-			for index, name := range names {
-				if name == "" || index >= len(match) {
+func latestResolvedPlanPathFromTranscript(cwd, transcriptPath string) (string, error) {
+	for _, allowedKinds := range [][]string{{"agent_message", "assistant"}, {"function_call", "function_call_output"}} {
+		resolvedPlanPath := ""
+		err := reverseScanJSONLLines(transcriptPath, func(line []byte) bool {
+			for _, item := range transcriptTextsFromLine(line) {
+				if !containsKind(allowedKinds, item.Kind) {
 					continue
 				}
-				values[name] = match[index]
+				path, slug, ok := latestPlanRefFromText(item.Text)
+				if !ok {
+					continue
+				}
+				candidate, err := resolvePlanPath(cwd, path, slug)
+				if err != nil || candidate == "" {
+					continue
+				}
+				resolvedPlanPath = candidate
+				return false
 			}
-			slug := values["slug1"]
-			if slug == "" {
-				slug = values["slug2"]
-			}
-			if slug == "" {
-				slug = values["slug3"]
-			}
-			if slug == "" {
-				continue
-			}
-			latestSlug = slug
-			latestPath = values["path"]
+			return true
+		})
+		if err != nil {
+			return "", err
+		}
+		if resolvedPlanPath != "" {
+			return resolvedPlanPath, nil
 		}
 	}
-	return latestPath, latestSlug, nil
+	return "", nil
 }
 
-func transcriptTexts(transcriptPath string) ([]transcriptText, error) {
-	file, err := os.Open(transcriptPath)
-	if err != nil {
-		return nil, err
+func transcriptTextsFromLine(raw []byte) []transcriptText {
+	var line map[string]any
+	if err := json.Unmarshal(raw, &line); err != nil {
+		return nil
 	}
-	defer file.Close()
+	payload, _ := line["payload"].(map[string]any)
 	var results []transcriptText
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var line map[string]any
-		if err := json.Unmarshal(scanner.Bytes(), &line); err != nil {
-			continue
-		}
-		payload, _ := line["payload"].(map[string]any)
-		switch line["type"] {
-		case "event_msg":
-			if payload["type"] == "agent_message" {
-				if message, ok := payload["message"].(string); ok {
-					results = append(results, transcriptText{Kind: "agent_message", Text: message})
-				}
+	switch line["type"] {
+	case "event_msg":
+		if payload["type"] == "agent_message" {
+			if message, ok := payload["message"].(string); ok {
+				results = append(results, transcriptText{Kind: "agent_message", Text: message})
 			}
-		case "response_item":
-			if payload["role"] == "assistant" {
-				if content, ok := payload["content"].([]any); ok {
-					parts := make([]string, 0, len(content))
-					for _, item := range content {
-						if entry, ok := item.(map[string]any); ok {
-							if text, ok := entry["text"].(string); ok {
-								parts = append(parts, text)
-							} else if text, ok := entry["content"].(string); ok {
-								parts = append(parts, text)
-							}
+		}
+	case "response_item":
+		if payload["type"] == "function_call_output" {
+			if output, ok := payload["output"].(string); ok {
+				results = append(results, transcriptText{Kind: "function_call_output", Text: output})
+			}
+		}
+		if payload["type"] == "function_call" {
+			if arguments, ok := payload["arguments"].(string); ok {
+				results = append(results, transcriptText{Kind: "function_call", Text: arguments})
+			}
+		}
+		if payload["role"] == "assistant" {
+			if content, ok := payload["content"].([]any); ok {
+				parts := make([]string, 0, len(content))
+				for _, item := range content {
+					if entry, ok := item.(map[string]any); ok {
+						if text, ok := entry["text"].(string); ok {
+							parts = append(parts, text)
+						} else if text, ok := entry["content"].(string); ok {
+							parts = append(parts, text)
 						}
 					}
-					if len(parts) > 0 {
-						results = append(results, transcriptText{Kind: "assistant", Text: strings.Join(parts, "\n")})
-					}
 				}
-			}
-			if payload["type"] == "function_call" {
-				if arguments, ok := payload["arguments"].(string); ok {
-					results = append(results, transcriptText{Kind: "function_call", Text: arguments})
-				}
-			}
-			if payload["type"] == "function_call_output" {
-				if output, ok := payload["output"].(string); ok {
-					results = append(results, transcriptText{Kind: "function_call_output", Text: output})
+				if len(parts) > 0 {
+					results = append(results, transcriptText{Kind: "assistant", Text: strings.Join(parts, "\n")})
 				}
 			}
 		}
 	}
-	return results, scanner.Err()
+	return results
+}
+
+func containsKind(kinds []string, target string) bool {
+	for _, kind := range kinds {
+		if kind == target {
+			return true
+		}
+	}
+	return false
+}
+
+func latestPlanRefFromText(text string) (string, string, bool) {
+	matches := planRefRE.FindAllStringSubmatch(text, -1)
+	if len(matches) == 0 {
+		return "", "", false
+	}
+	match := matches[len(matches)-1]
+	values := map[string]string{}
+	for index, name := range planRefRE.SubexpNames() {
+		if name == "" || index >= len(match) {
+			continue
+		}
+		values[name] = match[index]
+	}
+	slug := values["slug1"]
+	if slug == "" {
+		slug = values["slug2"]
+	}
+	if slug == "" {
+		slug = values["slug3"]
+	}
+	if slug == "" {
+		return "", "", false
+	}
+	return values["path"], slug, true
+}
+
+func reverseScanJSONLLines(path string, visit func([]byte) bool) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	position := info.Size()
+	var tail []byte
+	for position > 0 {
+		start := position - reverseReadBlockSize
+		if start < 0 {
+			start = 0
+		}
+		chunk := make([]byte, position-start)
+		if _, err := file.ReadAt(chunk, start); err != nil {
+			return err
+		}
+		data := append(chunk, tail...)
+		parts := bytes.Split(data, []byte{'\n'})
+		for index := len(parts) - 1; index >= 1; index-- {
+			line := bytes.TrimSpace(parts[index])
+			if len(line) == 0 {
+				continue
+			}
+			if !visit(line) {
+				return nil
+			}
+		}
+		tail = append(tail[:0], parts[0]...)
+		position = start
+	}
+	line := bytes.TrimSpace(tail)
+	if len(line) > 0 {
+		visit(line)
+	}
+	return nil
+}
+
+func newScanner(reader io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxScannerTokenSize)
+	return scanner
 }
 
 func resolvePlanPath(cwd, transcriptPlanPath, transcriptSlug string) (string, error) {
