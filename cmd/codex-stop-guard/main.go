@@ -14,9 +14,14 @@ import (
 )
 
 const (
-	maxPlanAge           = 24 * time.Hour
-	maxScannerTokenSize  = 2 * 1024 * 1024
-	reverseReadBlockSize = 64 * 1024
+	maxPlanAge                = 24 * time.Hour
+	maxScannerTokenSize       = 2 * 1024 * 1024
+	reverseReadBlockSize      = 64 * 1024
+	recentVisibleMessageLimit = 24
+	minRepeatTextLength       = 80
+	similarityThreshold       = 0.90
+	repeatReviewThreshold     = 2
+	repeatAllowThreshold      = 3
 )
 
 var (
@@ -84,7 +89,19 @@ func evaluateStopGuard(stdin io.Reader) (*stopGuardDecision, error) {
 	if !ok {
 		return nil, nil
 	}
-	reason := fmt.Sprintf("继续当前任务。检测到当前活跃计划 %s 仍有 %d 个未完成项。优先完成当前 active milestone 或明确记录 blocker 后再停止。未完成项示例：%s", filepath.Base(activePlanPath), openCount, strings.Join(examples, "；"))
+	repeatStreak, err := repeatedLoopStreak(transcriptPath)
+	if err != nil {
+		return nil, nil
+	}
+	if repeatStreak >= repeatAllowThreshold {
+		return nil, nil
+	}
+	preview := strings.Join(examples, "；")
+	if repeatStreak >= repeatReviewThreshold {
+		reason := fmt.Sprintf("继续当前任务。检测到当前活跃计划 %s 仍有 %d 个未完成项，且当前会话已连续出现 %d 次高相似重复输出，疑似卡在重复回路。先不要继续机械重试：立即找 reviewer 判断怎么解除 block；若 reviewer 仍确认当前主线无法推进，请把当前 milestone 记为 [!]，并把 final status 更新为 blocked 后再停止。若你判断当前尝试仍有意义，下一轮必须显著改变思路/证据描述来打破重复检测。若后续仍持续重复，hook 将自动停止阻塞以避免死循环。未完成项示例：%s", filepath.Base(activePlanPath), openCount, repeatStreak, preview)
+		return &stopGuardDecision{Decision: "block", Reason: reason}, nil
+	}
+	reason := fmt.Sprintf("继续当前任务。检测到当前活跃计划 %s 仍有 %d 个未完成项。优先完成当前 active milestone 或明确记录 blocker 后再停止。未完成项示例：%s", filepath.Base(activePlanPath), openCount, preview)
 	return &stopGuardDecision{Decision: "block", Reason: reason}, nil
 }
 
@@ -198,6 +215,168 @@ func transcriptTextsFromLine(raw []byte) []transcriptText {
 		}
 	}
 	return results
+}
+
+func transcriptVisibleMessageFromLine(raw []byte) string {
+	var line map[string]any
+	if err := json.Unmarshal(raw, &line); err != nil {
+		return ""
+	}
+	payload, _ := line["payload"].(map[string]any)
+	if line["type"] == "event_msg" && payload["type"] == "agent_message" {
+		if message, ok := payload["message"].(string); ok {
+			return message
+		}
+	}
+	if line["type"] != "response_item" || payload["role"] != "assistant" {
+		return ""
+	}
+	content, ok := payload["content"].([]any)
+	if !ok {
+		return ""
+	}
+	parts := make([]string, 0, len(content))
+	for _, item := range content {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if text, ok := entry["text"].(string); ok {
+			parts = append(parts, text)
+		} else if text, ok := entry["content"].(string); ok {
+			parts = append(parts, text)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+func normalizeMessageText(text string) string {
+	return strings.Join(strings.Fields(text), " ")
+}
+
+func recentVisibleMessages(transcriptPath string, limit int) ([]string, error) {
+	messages := make([]string, 0, limit)
+	lastText := ""
+	err := reverseScanJSONLLines(transcriptPath, func(line []byte) bool {
+		text := transcriptVisibleMessageFromLine(line)
+		if text == "" {
+			return true
+		}
+		normalized := normalizeMessageText(text)
+		if normalized == "" || normalized == lastText {
+			return true
+		}
+		messages = append(messages, normalized)
+		lastText = normalized
+		return len(messages) < limit
+	})
+	if err != nil {
+		return nil, err
+	}
+	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
+		messages[left], messages[right] = messages[right], messages[left]
+	}
+	return messages, nil
+}
+
+func repeatedLoopStreak(transcriptPath string) (int, error) {
+	visibleMessages, err := recentVisibleMessages(transcriptPath, recentVisibleMessageLimit)
+	if err != nil {
+		return 0, err
+	}
+	longMessages := make([]string, 0, len(visibleMessages))
+	for _, message := range visibleMessages {
+		if len([]rune(message)) >= minRepeatTextLength {
+			longMessages = append(longMessages, message)
+		}
+	}
+	if len(longMessages) == 0 {
+		return 0, nil
+	}
+	latest := longMessages[len(longMessages)-1]
+	repeats := 1
+	for i := len(longMessages) - 2; i >= 0; i-- {
+		if similarityRatio(latest, longMessages[i]) < similarityThreshold {
+			break
+		}
+		repeats++
+	}
+	return repeats, nil
+}
+
+func similarityRatio(a, b string) float64 {
+	if a == b {
+		return 1
+	}
+	ar := []rune(a)
+	br := []rune(b)
+	if len(ar) == 0 || len(br) == 0 {
+		return 0
+	}
+	maxLen := len(ar)
+	if len(br) > maxLen {
+		maxLen = len(br)
+	}
+	minLen := len(ar)
+	if len(br) < minLen {
+		minLen = len(br)
+	}
+	if float64(minLen)/float64(maxLen) < similarityThreshold {
+		return 0
+	}
+	maxDistance := int((1 - similarityThreshold) * float64(maxLen))
+	distance := boundedLevenshteinDistance(ar, br, maxDistance)
+	if distance > maxDistance {
+		return 0
+	}
+	ratio := 1 - float64(distance)/float64(maxLen)
+	if ratio < 0 {
+		return 0
+	}
+	return ratio
+}
+
+func boundedLevenshteinDistance(a, b []rune, maxDistance int) int {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	if len(b)-len(a) > maxDistance {
+		return maxDistance + 1
+	}
+	previous := make([]int, len(a)+1)
+	current := make([]int, len(a)+1)
+	for i := range previous {
+		previous[i] = i
+	}
+	for j := 1; j <= len(b); j++ {
+		current[0] = j
+		rowMin := current[0]
+		for i := 1; i <= len(a); i++ {
+			cost := 0
+			if a[i-1] != b[j-1] {
+				cost = 1
+			}
+			current[i] = minInt(current[i-1]+1, previous[i]+1, previous[i-1]+cost)
+			if current[i] < rowMin {
+				rowMin = current[i]
+			}
+		}
+		if rowMin > maxDistance {
+			return maxDistance + 1
+		}
+		previous, current = current, previous
+	}
+	return previous[len(a)]
+}
+
+func minInt(values ...int) int {
+	result := values[0]
+	for _, value := range values[1:] {
+		if value < result {
+			result = value
+		}
+	}
+	return result
 }
 
 func containsKind(kinds []string, target string) bool {

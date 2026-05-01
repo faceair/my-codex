@@ -126,6 +126,66 @@ func TestStopGuardFallsBackToFunctionCallWhenAssistantDidNotMentionPlan(t *testi
 	assertStopGuardBlocks(t, tempDir, transcriptPath)
 }
 
+func TestStopGuardRequestsReviewerWhenRepeatedSimilarOutputs(t *testing.T) {
+	tempDir := t.TempDir()
+	planPath := writeOpenPlan(t, tempDir, "2026-05-01T14-55-06-align-stop-guard-with-python-hook.md", `
+# Plan: 2026-05-01T14-55-06-align-stop-guard-with-python-hook
+
+## Meta
+- status: in_progress
+
+## Milestones
+- [>] M1. 补齐重复输出保护
+- [ ] M2. 增加回归测试
+`)
+	transcriptPath := filepath.Join(tempDir, "transcript.jsonl")
+	writeAssistantMessage(t, transcriptPath, planPath)
+	appendAssistantMessage(t, transcriptPath, repeatedProgressMessage("继续执行重复路径", "第一次"))
+	appendAssistantMessage(t, transcriptPath, repeatedProgressMessage("继续执行重复路径", "第二次"))
+
+	payload := map[string]any{
+		"hook_event_name": "Stop",
+		"cwd":             tempDir,
+		"transcript_path": transcriptPath,
+	}
+	rawPayload, _ := json.Marshal(payload)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := RunStopGuard(bytes.NewReader(rawPayload), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected stop guard exit code 0, got %d, stderr=%s", code, stderr.String())
+	}
+	var decision map[string]any
+	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &decision); err != nil {
+		t.Fatalf("decode stop guard output: %v, raw=%s", err, stdout.String())
+	}
+	reason, _ := decision["reason"].(string)
+	if decision["decision"] != "block" || !strings.Contains(reason, "reviewer") || !strings.Contains(reason, "高相似重复输出") {
+		t.Fatalf("expected repeated-loop reviewer block, got %#v", decision)
+	}
+}
+
+func TestStopGuardAllowsAfterRepeatedSimilarOutputsReachLimit(t *testing.T) {
+	tempDir := t.TempDir()
+	planPath := writeOpenPlan(t, tempDir, "2026-05-01T14-55-06-align-stop-guard-with-python-hook.md", `
+# Plan: 2026-05-01T14-55-06-align-stop-guard-with-python-hook
+
+## Meta
+- status: in_progress
+
+## Milestones
+- [>] M1. 补齐重复输出保护
+- [ ] M2. 增加回归测试
+`)
+	transcriptPath := filepath.Join(tempDir, "transcript.jsonl")
+	writeAssistantMessage(t, transcriptPath, planPath)
+	appendAssistantMessage(t, transcriptPath, repeatedProgressMessage("继续执行重复路径", "第一次"))
+	appendAssistantMessage(t, transcriptPath, repeatedProgressMessage("继续执行重复路径", "第二次"))
+	appendAssistantMessage(t, transcriptPath, repeatedProgressMessage("继续执行重复路径", "第三次"))
+
+	assertStopGuardAllows(t, tempDir, transcriptPath)
+}
+
 func writeOpenPlan(t *testing.T, tempDir, name, body string) string {
 	t.Helper()
 	planDir := filepath.Join(tempDir, ".codex", "plans")
@@ -167,6 +227,32 @@ func appendTranscriptLine(t *testing.T, path string, value map[string]any) {
 	}
 }
 
+func writeAssistantMessage(t *testing.T, path, text string) {
+	t.Helper()
+	writeTranscriptLine(t, path, map[string]any{
+		"type": "response_item",
+		"payload": map[string]any{
+			"role":    "assistant",
+			"content": []map[string]any{{"text": text}},
+		},
+	})
+}
+
+func appendAssistantMessage(t *testing.T, path, text string) {
+	t.Helper()
+	appendTranscriptLine(t, path, map[string]any{
+		"type": "response_item",
+		"payload": map[string]any{
+			"role":    "assistant",
+			"content": []map[string]any{{"text": text}},
+		},
+	})
+}
+
+func repeatedProgressMessage(prefix, suffix string) string {
+	return prefix + "：我会继续沿着当前执行路径检查同一批证据，并重复说明这些步骤还没有完成，需要继续当前任务直到验证闭环。这里保留足够长的稳定文本，用来模拟真实长输出中只有少量词变化但整体内容高度相似的重复回路。" + suffix
+}
+
 func assertStopGuardBlocks(t *testing.T, cwd, transcriptPath string) {
 	t.Helper()
 	payload := map[string]any{
@@ -192,5 +278,24 @@ func assertBlockedDecision(t *testing.T, raw []byte) {
 	}
 	if decision["decision"] != "block" {
 		t.Fatalf("expected stop guard to block, got %#v", decision)
+	}
+}
+
+func assertStopGuardAllows(t *testing.T, cwd, transcriptPath string) {
+	t.Helper()
+	payload := map[string]any{
+		"hook_event_name": "Stop",
+		"cwd":             cwd,
+		"transcript_path": transcriptPath,
+	}
+	rawPayload, _ := json.Marshal(payload)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := RunStopGuard(bytes.NewReader(rawPayload), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected stop guard exit code 0, got %d, stderr=%s", code, stderr.String())
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("expected stop guard to allow without output, got %s", stdout.String())
 	}
 }
