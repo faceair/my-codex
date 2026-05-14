@@ -9,6 +9,7 @@ import (
 
 const (
 	managedBinaryName = "my-codex"
+	codexBinaryName   = "codex"
 	hookBinaryName    = "codex-stop-guard"
 )
 

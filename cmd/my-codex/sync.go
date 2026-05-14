@@ -27,7 +27,7 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 		options.Runner = ExecRunner{}
 	}
 	if options.CodexBinary == "" {
-		options.CodexBinary = managedBinaryName
+		options.CodexBinary = codexBinaryName
 	}
 	if err := ensureCommandExists("git"); err != nil {
 		return err

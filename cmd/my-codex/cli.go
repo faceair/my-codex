@@ -37,7 +37,7 @@ func runSyncCLI(args []string, stdout, stderr io.Writer, version string) int {
 	defaultHome, _ := DefaultCodexHome()
 	repoRoot := fs.String("repo-root", cwd, "Repository root to sync into")
 	sourceRoot := fs.String("source-root", defaultHome, "Local .codex root to sync from")
-	codexBinary := fs.String("codex-bin", envOrDefault("CODEX_BIN", managedBinaryName), "Codex executable used for commit message generation")
+	codexBinary := fs.String("codex-bin", envOrDefault("CODEX_BIN", codexBinaryName), "Codex executable used for commit message generation")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
