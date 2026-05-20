@@ -22,6 +22,7 @@ const (
 	similarityThreshold       = 0.90
 	repeatReviewThreshold     = 2
 	repeatAllowThreshold      = 3
+	stopHookContinuationExit  = 2
 )
 
 var (
@@ -37,19 +38,25 @@ func main() {
 func RunStopGuard(stdin io.Reader, stdout, stderr io.Writer) int {
 	decision, err := evaluateStopGuard(stdin)
 	if err != nil {
-		fmt.Fprintf(stderr, "Failed to evaluate stop guard with context: %v\n", err)
-		return 1
+		writeStopGuardFailure(stderr, "evaluate Stop hook", err)
+		return stopHookContinuationExit
 	}
 	if decision == nil {
 		return 0
 	}
 	encoded, err := json.Marshal(decision)
 	if err != nil {
-		fmt.Fprintf(stderr, "Failed to encode stop guard decision with context: %v\n", err)
-		return 1
+		writeStopGuardFailure(stderr, "encode Stop hook decision", err)
+		return stopHookContinuationExit
 	}
 	_, _ = fmt.Fprintln(stdout, string(encoded))
 	return 0
+}
+
+func writeStopGuardFailure(stderr io.Writer, action string, err error) {
+	// Codex renders Stop hook exit code 2 stderr as visible feedback and injects it
+	// into the continuation prompt; exit 1 would only surface a generic status code.
+	fmt.Fprintf(stderr, "codex-stop-guard failed to %s: %v\n", action, err)
 }
 
 type stopGuardDecision struct {
@@ -78,11 +85,17 @@ func evaluateStopGuard(stdin io.Reader) (*stopGuardDecision, error) {
 	}
 	transcriptPath := filepath.Clean(payload.TranscriptPath)
 	isSubagent, err := isSubagentSession(transcriptPath)
-	if err != nil || isSubagent {
+	if err != nil {
+		return nil, fmt.Errorf("detect subagent session from transcript %s: %w", transcriptPath, err)
+	}
+	if isSubagent {
 		return nil, nil
 	}
 	activePlanPath, err := latestResolvedPlanPathFromTranscript(filepath.Clean(payload.Cwd), transcriptPath)
-	if err != nil || activePlanPath == "" {
+	if err != nil {
+		return nil, fmt.Errorf("resolve latest plan from transcript %s in cwd %s: %w", transcriptPath, filepath.Clean(payload.Cwd), err)
+	}
+	if activePlanPath == "" {
 		return nil, nil
 	}
 	openCount, examples, ok := planSummary(activePlanPath)
@@ -91,7 +104,7 @@ func evaluateStopGuard(stdin io.Reader) (*stopGuardDecision, error) {
 	}
 	repeatStreak, err := repeatedLoopStreak(transcriptPath)
 	if err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("detect repeated output loop from transcript %s: %w", transcriptPath, err)
 	}
 	if repeatStreak >= repeatAllowThreshold {
 		return nil, nil

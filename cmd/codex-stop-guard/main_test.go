@@ -186,6 +186,42 @@ func TestStopGuardAllowsAfterRepeatedSimilarOutputsReachLimit(t *testing.T) {
 	assertStopGuardAllows(t, tempDir, transcriptPath)
 }
 
+func TestStopGuardExposesMalformedPayloadErrorsAsContinuation(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := RunStopGuard(strings.NewReader("{"), &stdout, &stderr)
+
+	if code != stopHookContinuationExit {
+		t.Fatalf("expected stop guard exit code %d, got %d", stopHookContinuationExit, code)
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("expected no stdout on malformed payload, got %s", stdout.String())
+	}
+	assertHookFailureVisible(t, stderr.String(), "decode hook payload")
+}
+
+func TestStopGuardExposesTranscriptReadErrorsAsContinuation(t *testing.T) {
+	tempDir := t.TempDir()
+	transcriptPath := filepath.Join(tempDir, "missing-transcript.jsonl")
+	rawPayload, _ := json.Marshal(map[string]any{
+		"hook_event_name": "Stop",
+		"cwd":             tempDir,
+		"transcript_path": transcriptPath,
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := RunStopGuard(bytes.NewReader(rawPayload), &stdout, &stderr)
+
+	if code != stopHookContinuationExit {
+		t.Fatalf("expected stop guard exit code %d, got %d", stopHookContinuationExit, code)
+	}
+	if strings.TrimSpace(stdout.String()) != "" {
+		t.Fatalf("expected no stdout on transcript read error, got %s", stdout.String())
+	}
+	assertHookFailureVisible(t, stderr.String(), "detect subagent session from transcript "+transcriptPath)
+}
+
 func writeOpenPlan(t *testing.T, tempDir, name, body string) string {
 	t.Helper()
 	planDir := filepath.Join(tempDir, ".codex", "plans")
@@ -297,5 +333,15 @@ func assertStopGuardAllows(t *testing.T, cwd, transcriptPath string) {
 	}
 	if strings.TrimSpace(stdout.String()) != "" {
 		t.Fatalf("expected stop guard to allow without output, got %s", stdout.String())
+	}
+}
+
+func assertHookFailureVisible(t *testing.T, stderr, want string) {
+	t.Helper()
+	if !strings.Contains(stderr, "codex-stop-guard failed to evaluate Stop hook:") {
+		t.Fatalf("expected contextual hook failure prefix, got %q", stderr)
+	}
+	if !strings.Contains(stderr, want) {
+		t.Fatalf("expected hook failure to contain %q, got %q", want, stderr)
 	}
 }
