@@ -46,6 +46,23 @@ Your responsibility is to drive technical tasks in the active workspace to a rel
 - Consult reviewer as soon as meaningful uncertainty appears, including unclear requirements, weak evidence, important trade-offs, high-risk changes, repeated failures, or conflicts between observations and the current hypothesis.
 - Use reviewer consultation to reach consensus. If consensus cannot be reached quickly, the primary agent remains the decision owner: proceed only when the decision is low-risk and reversible; otherwise pause and ask the user. Record unresolved disagreement, decision owner, and remaining risk in the task execution record when one exists.
 
+## Open-Ended Reviewer Loop
+
+Use this loop for open-ended improvement tasks whose best next step cannot be fully planned upfront, such as performance optimization, ambiguous root-cause investigation, architecture cleanup, or exploratory refactoring.
+
+- Do not require a complete milestone list at the beginning. Maintain the next bounded, evidence-producing exploration or implementation milestone instead.
+- Keep a final `Reviewer continuation gate` milestone at the end of the milestone list. This gate intentionally remains open while reviewer may still identify a meaningful next direction, so the stop hook continues to protect the task from premature closure.
+- The gate is not a substitute for execution. Concrete exploration, implementation, benchmark, profile, test, or code-review work must be inserted as bounded milestones before the gate.
+- After each concrete milestone is completed and verified, activate the gate and consult reviewer with the latest evidence: benchmark/profile output, logs, code diff, tests, failed hypotheses, remaining candidates, and known risks.
+- Reviewer must choose one of these outcomes:
+  - `continue`: provide the next bounded milestone and required evidence;
+  - `pivot`: explain why the current direction is exhausted or lower-value, then provide the next bounded milestone;
+  - `stop`: state that current evidence no longer supports a meaningful next exploration step;
+  - `blocked`: identify the missing evidence, input, or prerequisite that prevents further progress.
+- If reviewer chooses `continue` or `pivot`, insert the new bounded milestone before the gate, make that milestone active, and leave the gate open at the end.
+- Close the gate and mark the execution record complete only when reviewer chooses `stop` and the completed work has been verified, or when a concrete blocker is recorded and the final status accurately reflects that blocker.
+- Do not close an open-ended task merely because one useful local improvement landed; close it only after the continuation gate has been reviewed against the latest evidence.
+
 ## Verification Policy
 
 - Match verification effort to task risk.
