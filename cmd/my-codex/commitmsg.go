@@ -25,14 +25,12 @@ var execLookPath = func(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-func findCommitPromptFile(promptsDir string) (string, error) {
-	for _, candidate := range []string{"commit-and-push.md", "smart-commit.md"} {
-		path := filepath.Join(promptsDir, candidate)
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
-		}
+func findCommitInstructionFile(skillsDir string) (string, error) {
+	path := filepath.Join(skillsDir, "commit-and-push", "SKILL.md")
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
 	}
-	return "", fmt.Errorf("missing commit prompt in %s: expected commit-and-push.md or smart-commit.md", promptsDir)
+	return "", fmt.Errorf("missing commit-and-push skill in %s", skillsDir)
 }
 
 func generateCommitMessage(repoRoot, codexBinary string, runner CommandRunner, syncTargets []string) (string, error) {
@@ -40,13 +38,13 @@ func generateCommitMessage(repoRoot, codexBinary string, runner CommandRunner, s
 	if err != nil {
 		return "", err
 	}
-	promptFile, err := findCommitPromptFile(filepath.Join(repoRoot, "prompts"))
+	instructionFile, err := findCommitInstructionFile(filepath.Join(repoRoot, "skills"))
 	if err != nil {
 		return "", err
 	}
-	promptContent, err := os.ReadFile(promptFile)
+	promptContent, err := os.ReadFile(instructionFile)
 	if err != nil {
-		return "", fmt.Errorf("read commit prompt %s: %w", promptFile, err)
+		return "", fmt.Errorf("read commit instruction %s: %w", instructionFile, err)
 	}
 	promptText := strings.Join([]string{
 		strings.TrimSpace(string(promptContent)),

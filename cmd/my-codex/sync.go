@@ -39,7 +39,7 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 	if strings.TrimSpace(gitCheck.Stdout) != "true" {
 		return fmt.Errorf("current directory is not a git repository: %s", repoRoot)
 	}
-	for _, required := range []string{"agents", "config.toml", "prompts"} {
+	for _, required := range []string{"agents", "config.toml", "skills"} {
 		candidate := filepath.Join(sourceRoot, required)
 		if _, err := os.Stat(candidate); err != nil {
 			return fmt.Errorf("missing source path: %s", candidate)
@@ -48,28 +48,16 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 	if err := copyDirFromOS(filepath.Join(sourceRoot, "agents"), filepath.Join(repoRoot, "agents")); err != nil {
 		return err
 	}
-	if err := copyDirFromOS(filepath.Join(sourceRoot, "prompts"), filepath.Join(repoRoot, "prompts")); err != nil {
+	if err := copyDirFromOS(filepath.Join(sourceRoot, "skills"), filepath.Join(repoRoot, "skills")); err != nil {
 		return err
 	}
 	if err := syncOptionalDir(filepath.Join(sourceRoot, "instructions"), filepath.Join(repoRoot, "instructions")); err != nil {
 		return err
 	}
-	if err := syncHooksJSONForRepo(filepath.Join(sourceRoot, "hooks.json"), filepath.Join(repoRoot, "hooks.json")); err != nil {
-		return err
-	}
 	if err := syncManagedConfig(filepath.Join(sourceRoot, "config.toml"), filepath.Join(repoRoot, "config.toml")); err != nil {
 		return err
 	}
-	syncTargets := []string{"agents", "prompts", "instructions", "config.toml"}
-	for _, optionalTarget := range []string{"hooks.json"} {
-		present, err := trackedOrPresent(repoRoot, optionalTarget, options.Runner)
-		if err != nil {
-			return err
-		}
-		if present {
-			syncTargets = append(syncTargets, optionalTarget)
-		}
-	}
+	syncTargets := []string{"agents", "skills", "instructions", "config.toml"}
 	if _, err := options.Runner.Run(append([]string{"git", "add", "-A", "--"}, syncTargets...), RunOptions{Cwd: repoRoot}); err != nil {
 		return err
 	}
@@ -98,10 +86,9 @@ func runSync(options SyncOptions, stdoutWriter, stderrWriter io.Writer) error {
 	fmt.Fprintf(stdoutWriter, "Synced to: %s\n", repoRoot)
 	fmt.Fprintln(stdoutWriter, "Updated files:")
 	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(repoRoot, "agents"))
-	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(repoRoot, "prompts"))
+	fmt.Fprintf(stdoutWriter, "  - %s\n", filepath.Join(repoRoot, "skills"))
 	fmt.Fprintf(stdoutWriter, "  - %s (incremental sync when source exists; existing destination files are preserved)\n", filepath.Join(repoRoot, "instructions"))
-	fmt.Fprintf(stdoutWriter, "  - %s (managed stop hook command normalized to macOS-style repo path)\n", filepath.Join(repoRoot, "hooks.json"))
-	fmt.Fprintf(stdoutWriter, "  - %s (whitelist only: model_instructions_file, [features].codex_hooks, [agents.reviewer].config_file)\n", filepath.Join(repoRoot, "config.toml"))
+	fmt.Fprintf(stdoutWriter, "  - %s (whitelist only: model_instructions_file, [features].goals, [agents.reviewer].config_file)\n", filepath.Join(repoRoot, "config.toml"))
 	fmt.Fprintln(stdoutWriter, "Committed and pushed with message:")
 	fmt.Fprintln(stdoutWriter, commitMessage)
 	_ = stderrWriter
@@ -113,28 +100,6 @@ func syncOptionalDir(source, destination string) error {
 		return copyDirFromOS(source, destination)
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat optional dir %s: %w", source, err)
-	}
-	return nil
-}
-
-func syncHooksJSONForRepo(source, destination string) error {
-	raw, err := os.ReadFile(source)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read source hooks.json %s: %w", source, err)
-	}
-	existingRaw, err := os.ReadFile(destination)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read existing repo hooks.json %s: %w", destination, err)
-	}
-	normalized, err := mergeManagedHookJSON(raw, existingRaw, RepoHookCommand())
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(destination, normalized, 0o644); err != nil {
-		return fmt.Errorf("write repo hooks.json %s: %w", destination, err)
 	}
 	return nil
 }

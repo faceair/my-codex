@@ -20,7 +20,7 @@ func TestRunSyncDefaultsCommitGeneratorToCodexCLI(t *testing.T) {
 		}
 	}
 	mustWriteFile(t, filepath.Join(sourceRoot, "agents", "reviewer.toml"), "name = \"reviewer\"\n", 0o644)
-	mustWriteFile(t, filepath.Join(sourceRoot, "prompts", "commit-and-push.md"), "Write a commit message.\n", 0o644)
+	mustWriteFile(t, filepath.Join(sourceRoot, "skills", "commit-and-push", "SKILL.md"), "# Commit and Push\n", 0o644)
 	mustWriteFile(t, filepath.Join(sourceRoot, "instructions", "main.md"), "# main\n", 0o644)
 	mustWriteFile(t, filepath.Join(sourceRoot, "config.toml"), "model_instructions_file = \"instructions/main.md\"\n", 0o644)
 
@@ -83,9 +83,6 @@ func (r *syncDefaultCodexRunner) Run(command []string, options RunOptions) (RunR
 	}
 	if reflect.DeepEqual(command, []string{"git", "push"}) {
 		return RunResult{}, nil
-	}
-	if reflect.DeepEqual(command, []string{"git", "ls-files", "--error-unmatch", "--", "hooks.json"}) {
-		return RunResult{ReturnCode: 1}, nil
 	}
 	return RunResult{}, fmt.Errorf("unexpected command: %s", strings.Join(command, " "))
 }

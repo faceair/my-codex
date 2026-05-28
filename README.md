@@ -63,19 +63,19 @@
 - 架构调整
 - 开放性技术决策
 
-### 3. Stop hook drives milestones to completion
+### 3. Goal continuation drives the work to completion
 
-这套配置带有 `Stop` hook，用来限制“做了一步就停”的行为。
+这套配置使用 Codex 原生 thread goal 来驱动长任务自动续跑。
 
-只要计划文件里还有未完成 milestone，agent 就不会轻易结束；它要么继续推进，要么明确记录 blocker。
+当 agent 创建非平凡任务的计划文件后，会同步创建一个指向该 plan 文件的 goal。plan 文件保存 milestone、证据、blocker 和 reviewer 记录；goal 负责让 Codex 在空闲时继续推进，直到目标完成或明确阻塞。
 
 这使得任务推进从“每一步都要人来催”变成：
 
-- agent 沿 milestone 持续工作
-- 做完再停
-- 做不下去时明确说明为什么停
+- agent 先读取 plan，再沿 active milestone 持续工作
+- 完成并验证后先收口 plan，再标记 goal complete
+- 做不下去时先记录 blocker，再按 goal 的 blocked 语义停止
 
-对使用者来说，这意味着这套工作流可以稳定支撑持续数小时的长任务，而不是一轮一轮地手动续命。
+对使用者来说，这意味着这套工作流可以稳定支撑持续数小时的长任务，而不再依赖外部 Stop hook。
 
 ### 4. Reviewer loop for open-ended work
 

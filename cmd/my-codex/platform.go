@@ -10,7 +10,6 @@ import (
 const (
 	managedBinaryName = "my-codex"
 	codexBinaryName   = "codex"
-	hookBinaryName    = "codex-stop-guard"
 )
 
 type Platform struct {
@@ -30,13 +29,6 @@ func (p Platform) ManagedBinaryFilename() string {
 		return managedBinaryName + ".exe"
 	}
 	return managedBinaryName
-}
-
-func (p Platform) HookBinaryFilename() string {
-	if p.IsWindows() {
-		return hookBinaryName + ".exe"
-	}
-	return hookBinaryName
 }
 
 func DefaultCodexHome() (string, error) {
@@ -63,12 +55,4 @@ func GoBinDir() (string, error) {
 		gopath = filepath.Join(home, "go")
 	}
 	return filepath.Join(gopath, "bin"), nil
-}
-
-func RepoHookCommand() string {
-	return fmt.Sprintf("\"$HOME/.codex/hooks/%s\"", hookBinaryName)
-}
-
-func LocalHookCommand(binaryPath string) string {
-	return fmt.Sprintf("\"%s\"", binaryPath)
 }

@@ -74,7 +74,7 @@ Treat contradictions as high-signal evidence. If an observation conflicts with t
 Use this loop for open-ended improvement tasks whose best next step cannot be fully planned upfront, such as performance optimization, ambiguous root-cause investigation, architecture cleanup, or exploratory refactoring.
 
 - Do not require a complete milestone list at the beginning. Maintain the next bounded, evidence-producing exploration or implementation milestone instead.
-- Keep a final `Reviewer continuation gate` milestone at the end of the milestone list. This gate intentionally remains open while reviewer may still identify a meaningful next direction, so the stop hook continues to protect the task from premature closure.
+- Keep a final `Reviewer continuation gate` milestone at the end of the milestone list. This gate intentionally remains open while reviewer may still identify a meaningful next direction, so the active thread goal continues to drive follow-up turns until reviewer stops or a blocker is recorded.
 - The gate is not a substitute for execution. Concrete exploration, implementation, benchmark, profile, test, or code-review work must be inserted as bounded milestones before the gate.
 - After each concrete milestone is completed and verified, activate the gate and consult reviewer with the latest evidence: benchmark/profile output, logs, code diff, tests, failed hypotheses, remaining candidates, known risks, and the current project-model understanding.
 - Reviewer must choose one of these outcomes:
@@ -101,6 +101,12 @@ Use this loop for open-ended improvement tasks whose best next step cannot be fu
 Create and maintain one task-local execution record in `./.codex/plans` for every non-trivial execution task.
 
 Use an execution record when the task is long-horizon, cross-turn, multi-milestone, high-risk, materially ambiguous, or likely to require context recovery. Do not create one for trivial, local, single-turn work that can be executed and verified without coordination overhead.
+
+## Thread Goal Continuation
+
+When you create a new non-trivial execution record, immediately call `get_goal`; if there is no active thread goal, call `create_goal` with a concise objective that points to the plan file. The goal objective should say to complete that execution record and read/update it before each continuation.
+
+The thread goal owns automatic continuation. The plan file owns detailed state: milestones, evidence, reviewer history, decisions, final outcome, and blockers. Before calling `update_goal`, update the plan file so its final status matches the goal status.
 
 Record rules:
 

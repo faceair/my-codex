@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,13 +38,14 @@ func TestRunSyncStagesCommitsAndPushes(t *testing.T) {
 	runGit(t, repoRoot, "git", "push", "-u", "origin", "main")
 
 	mustWriteFile(t, filepath.Join(sourceRoot, "agents", "reviewer.toml"), "name = \"reviewer\"\n", 0o644)
-	mustWriteFile(t, filepath.Join(sourceRoot, "prompts", "commit-and-push.md"), "Write a commit message.\n", 0o644)
+	mustWriteFile(t, filepath.Join(sourceRoot, "skills", "commit-and-push", "SKILL.md"), "# Commit and Push\n", 0o644)
 	mustWriteFile(t, filepath.Join(sourceRoot, "instructions", "main.md"), "# main\n", 0o644)
 	mustWriteFile(t, filepath.Join(sourceRoot, "config.toml"), strings.TrimSpace(`
 model = "ignored"
 model_instructions_file = "instructions/main.md"
 
 [features]
+goals = true
 codex_hooks = true
 chatty_output = true
 
@@ -53,11 +53,8 @@ chatty_output = true
 config_file = "agents/reviewer.toml"
 model = "ignored"
 `)+"\n", 0o644)
-	mustWriteFile(t, filepath.Join(sourceRoot, "hooks.json"), "{\n  \"hooks\": {\n    \"PreToolUse\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo local-only\"\n          }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"/usr/bin/python3 \\\"$HOME/.codex/hooks/stop_continue_if_todo.py\\\"\",\n            \"timeout\": 10,\n            \"statusMessage\": \"Checking unfinished plan items\"\n          }\n        ]\n      }\n    ]\n  }\n}\n", 0o644)
 	mustWriteFile(t, codexPath, "#!/usr/bin/env sh\nset -eu\nout=\"\"\nprev=\"\"\nfor arg in \"$@\"; do\n  if [ \"$prev\" = \"-o\" ]; then\n    out=\"$arg\"\n  fi\n  prev=\"$arg\"\ndone\nprintf 'chore: sync codex assets\\n' > \"$out\"\n", 0o755)
-	mustWriteFile(t, filepath.Join(repoRoot, "prompts", "legacy.md"), "legacy\n", 0o644)
 	mustWriteFile(t, filepath.Join(repoRoot, "instructions", "legacy.md"), "legacy\n", 0o644)
-	mustWriteFile(t, filepath.Join(repoRoot, "hooks.json"), "{\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo keep-repo-hook\"\n          }\n        ]\n      }\n    ]\n  }\n}\n", 0o644)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -76,33 +73,20 @@ model = "ignored"
 		t.Fatalf("read synced config.toml: %v", err)
 	}
 	configText := string(configContent)
-	if strings.Contains(configText, "chatty_output") || strings.Contains(configText, "model = \"ignored\"") {
-		t.Fatalf("expected synced config.toml to keep whitelist only, got:\n%s", configText)
+	for _, unexpected := range []string{"chatty_output", "codex_hooks", "model = \"ignored\""} {
+		if strings.Contains(configText, unexpected) {
+			t.Fatalf("expected synced config.toml to keep goals whitelist only, found %q in:\n%s", unexpected, configText)
+		}
 	}
-	if !strings.Contains(configText, "model_instructions_file = \"instructions/main.md\"") {
-		t.Fatalf("expected synced config.toml to include model_instructions_file, got:\n%s", configText)
+	for _, expected := range []string{"model_instructions_file = \"instructions/main.md\"", "goals = true", "config_file = \"agents/reviewer.toml\""} {
+		if !strings.Contains(configText, expected) {
+			t.Fatalf("expected synced config.toml to include %q, got:\n%s", expected, configText)
+		}
 	}
-
-	hooksJSON, err := os.ReadFile(filepath.Join(repoRoot, "hooks.json"))
-	if err != nil {
-		t.Fatalf("read repo hooks.json: %v", err)
-	}
-	var hooksDocument map[string]any
-	if err := json.Unmarshal(hooksJSON, &hooksDocument); err != nil {
-		t.Fatalf("decode repo hooks.json: %v", err)
-	}
-	if command := extractStopHookCommand(t, hooksDocument); command != RepoHookCommand() {
-		t.Fatalf("expected repo hooks.json to contain normalized hook command %q, got %q", RepoHookCommand(), command)
-	}
-	hooksRoot := hooksDocument["hooks"].(map[string]any)
-	if hooksRoot["PostToolUse"] == nil {
-		t.Fatalf("expected existing repo unmanaged hooks to be preserved")
-	}
-	if hooksRoot["PreToolUse"] != nil {
-		t.Fatalf("expected local unmanaged hooks not to be synced into repo")
+	if _, err := os.Stat(filepath.Join(repoRoot, "hooks.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected sync not to create hooks.json, err=%v", err)
 	}
 	for _, target := range []string{
-		filepath.Join(repoRoot, "prompts", "legacy.md"),
 		filepath.Join(repoRoot, "instructions", "legacy.md"),
 	} {
 		if _, err := os.Stat(target); err != nil {

@@ -50,16 +50,13 @@ This workflow separates execution from review.
 
 The result is a more reliable split: execution stays steady, while major decisions get a second opinion from a model with stronger breadth and better top-down judgment.
 
-### 3. Stop hook keeps milestones moving until the work is actually done
+### 3. Goal continuation keeps milestones moving until the work is actually done
 
-This workflow includes a `Stop` hook to prevent the agent from stopping too early.
+This workflow uses Codex native thread goals to keep long-running work moving.
 
-As long as the current plan still has unfinished milestones, the agent should either:
+When the agent creates a plan file for a non-trivial task, it also creates a thread goal that points to that plan. The plan file stores milestones, evidence, blockers, and reviewer history; the goal tells Codex to keep continuing the thread while the objective remains active.
 
-- keep moving forward, or
-- record a real blocker explicitly
-
-That changes the default behavior from “finish one step and stop” to “keep going until the plan is actually closed”.
+That changes the default behavior from “finish one step and stop” to “reload the plan, keep moving, and only mark the goal complete after the plan is closed and verified”.
 
 ### 4. Reviewer loop for open-ended work
 

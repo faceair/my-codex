@@ -54,8 +54,8 @@ func extractManagedDocument(source map[string]any) map[string]any {
 		}
 	}
 	if features, ok := source["features"].(map[string]any); ok {
-		if value, ok := features["codex_hooks"]; ok {
-			managed["features"] = map[string]any{"codex_hooks": deepCopy(value)}
+		if value, ok := features["goals"]; ok {
+			managed["features"] = map[string]any{"goals": deepCopy(value)}
 		}
 	}
 	if agents, ok := source["agents"].(map[string]any); ok {
@@ -85,6 +85,8 @@ func stripManagedKeys(document map[string]any) {
 	}
 	if features, ok := document["features"].(map[string]any); ok {
 		delete(features, "codex_hooks")
+		delete(features, "hooks")
+		delete(features, "goals")
 		if len(features) == 0 {
 			delete(document, "features")
 		}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Commit and Push"
+  short_description: "Commit focused changes and push safely."
+  default_prompt: "Use this skill to inspect the current Git repository, create focused Conventional Commit commits, preserve unrelated dirty changes, and push to the verified upstream or report a concrete blocker."

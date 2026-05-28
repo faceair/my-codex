@@ -53,22 +53,14 @@ func runPullCLI(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	defaultHome, _ := DefaultCodexHome()
 	destRoot := fs.String("dest-root", defaultHome, "Local .codex root to populate")
-	hookBinary := fs.String("hook-binary", envOrDefault("MY_CODEX_HOOK_BINARY", ""), "Path to codex-stop-guard binary (defaults to sibling binary or local build fallback)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if err := runPull(PullOptions{DestRoot: filepath.Clean(*destRoot), HookBinaryPath: cleanOptionalPath(*hookBinary), Runner: ExecRunner{}, Platform: CurrentPlatform()}, stdout, stderr); err != nil {
+	if err := runPull(PullOptions{DestRoot: filepath.Clean(*destRoot), Runner: ExecRunner{}, Platform: CurrentPlatform()}, stdout, stderr); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Failed to pull codex with context: %v\n", err)
 		return 1
 	}
 	return 0
-}
-
-func cleanOptionalPath(path string) string {
-	if path == "" {
-		return ""
-	}
-	return filepath.Clean(path)
 }
 
 func envOrDefault(key, fallback string) string {
@@ -81,6 +73,6 @@ func envOrDefault(key, fallback string) string {
 func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage:")
 	_, _ = fmt.Fprintln(w, "  my-codex sync [--repo-root PATH] [--source-root PATH] [--codex-bin PATH]")
-	_, _ = fmt.Fprintln(w, "  my-codex pull [--dest-root PATH] [--hook-binary PATH]")
+	_, _ = fmt.Fprintln(w, "  my-codex pull [--dest-root PATH]")
 	_, _ = fmt.Fprintln(w, "  my-codex version")
 }
