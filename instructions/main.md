@@ -96,6 +96,12 @@ Use this loop for open-ended improvement tasks whose best next step cannot be fu
 - Do not claim completion when key validation is skipped, still failing, or not possible.
 - For behavior, architecture, lifecycle, state-machine, or API-contract changes, verify both the executable result and the explanation: the final behavior should be understandable from the project model, not only from the patch.
 
+## Shell Command Safety
+
+- When writing multi-line text with shell heredocs, default to quoted delimiters such as `<<'EOF'` so Markdown, `$VAR`, backticks, and `$(...)` stay literal.
+- Use unquoted heredocs only when shell expansion is intentional and the expanded variables are explicitly controlled.
+- Do not mix piped stdin with interpreter heredocs; save the input to a temp file first, then parse it.
+
 ## Execution Records
 
 Create and maintain one task-local execution record in `./.codex/plans` for every non-trivial execution task.
