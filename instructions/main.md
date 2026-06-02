@@ -107,23 +107,23 @@ Use this loop for open-ended improvement tasks whose best next step cannot be fu
 
 Create and maintain one task-local execution record in `./.codex/plans` for every non-trivial execution task.
 
-Use an execution record when the task is long-horizon, cross-turn, multi-milestone, high-risk, materially ambiguous, or likely to require context recovery. Do not create one for trivial, local, single-turn work that can be executed and verified without coordination overhead.
+Use an execution record when the task is long-horizon, cross-turn, multi-milestone, high-risk, materially ambiguous, or likely to require context recovery. Do not create one for trivial, local, single-turn work.
 
-When you create a new non-trivial execution record, immediately call `get_goal`; if there is no active thread goal, call `create_goal` with a concise objective that points to the plan file. The goal objective should say to complete that execution record and read/update it before each continuation.
+When creating a new execution record, call `get_goal`; if there is no active thread goal, call `create_goal` with an objective that points to the plan file. The goal owns automatic continuation. The plan file owns durable task state.
 
-The thread goal owns automatic continuation. The plan file owns durable task memory: the agreed approach snapshot, milestones, evidence, reviewer history, decisions, final outcome, and blockers. Before calling `update_goal`, update the plan file so its final status matches the goal status.
+Treat the record as structured state, not a chronological transcript. Maintain one current source of truth for the objective, approach, milestones, evidence, decisions, reviewer input, verification, current state, and final outcome.
+
+Update the existing canonical sections as the task evolves. Do not append parallel structures when the right action is to revise the current objective, milestone list, current state, or final outcome. Preserve important history in the relevant log sections, but keep the record easy to resume after context compaction.
 
 Record rules:
 
-- One execution record corresponds to one top-level objective.
-- Scope the record around the full intended workspace end-state, not the first visible step.
-- If later work naturally continues the same end-state, extend the current record instead of creating a new one.
-- Store records as `./.codex/plans/{{timestamp}}-{{name}}.md` using `YYYY-MM-DDTHH-MM-SS` timestamps and a short kebab-case slug, for example `2026-05-20T04-30-00-fix-login.md`.
-- Keep records synchronized at key transitions: creation, milestone status changes, new blockers, material risk or decision changes, reviewer consultations, verification results, and final outcome.
-- Preserve the original agreed approach, not only execution progress. The approach snapshot should be concise free-form prose or bullets that capture the landing strategy, project model, important implementation details, ownership boundaries, non-goals, risks, and verification strategy needed to recover the reasoning after context compaction.
-- Do not force empty boilerplate into the record. If a detail is obvious or irrelevant, omit it; if a detail is needed to resume safely after compaction, write it down.
-- Do not expose internal milestone structure, reviewer notes, or execution-record content to the user unless asked.
-- Mark the record `done` only when the top-level objective is complete and verified. Otherwise use `blocked`, `cancelled`, or `verified_with_risk` when those states are more accurate.
+- One record corresponds to one top-level objective.
+- Scope the record around the intended workspace end-state, not only the first visible step.
+- If the same objective continues, extend the current record.
+- If the objective materially changes, record the scope change and rewrite the objective, done criteria, approach, and milestones so they describe the current task.
+- Keep `Meta.updated_at`, `Meta.status`, `Current State`, and `Final Outcome` consistent.
+- Mark the record `done` only when the objective is complete and verified. Otherwise use `blocked`, `cancelled`, or `verified_with_risk` when more accurate.
+- Before calling `update_goal` or giving final status, normalize the record so it has no stale active milestone, contradictory current state, or duplicated final result.
 
 TODO status markers:
 
@@ -135,13 +135,13 @@ TODO status markers:
 
 Milestone rules:
 
-- Each milestone must be a bounded work package in service of the same top-level objective.
-- Each milestone must use exactly one TODO status marker.
-- Each milestone should capture the milestone goal, expected evidence or verification, and the current note. Avoid repeating global scope unless it matters for that milestone.
+- Each milestone is a bounded work package under the same objective.
+- Each milestone uses exactly one TODO status marker.
 - Only one milestone may be `[>]` unless parallel work is explicitly justified.
-- For open-ended tasks, keep the `Reviewer continuation gate` milestone required by the Open-Ended Reviewer Loop and use the same lightweight milestone shape.
+- Later work belongs in `Milestones`; do not create a separate milestone structure.
+- For open-ended tasks, keep the `Reviewer continuation gate` milestone required by the Open-Ended Reviewer Loop.
 
-Use this template for every new execution record. Keep the headings stable, but write the body with the minimum detail needed for reliable continuation:
+Use this template for every new execution record and keep the headings stable:
 
 ```md
 # Plan: {{timestamp}}-{{name}}
@@ -157,7 +157,12 @@ Use this template for every new execution record. Keep the headings stable, but 
 - intended end-state:
 
 ## Approach Snapshot
-Describe the agreed landing strategy, project model, important boundaries, key implementation details, non-goals, risks, and verification strategy needed to recover the original reasoning after context compaction.
+- project model / owner:
+- key invariants:
+- landing strategy:
+- boundaries / non-goals:
+- risks:
+- verification strategy:
 
 ## Done Criteria
 - ...
@@ -168,15 +173,20 @@ Describe the agreed landing strategy, project model, important boundaries, key i
   - evidence / verification:
   - note:
 
-- [ ] M2. ...
-  - goal:
-  - evidence / verification:
-  - note:
+## Scope Changes
+- none yet
+
+## Decision Log
+- none yet
+
+## Evidence Log
+- none yet
 
 ## Reviewer Log
-- R1:
-  - scope:
-  - outcome:
+- none yet
+
+## Verification Log
+- none yet
 
 ## Current State
 - active milestone:
@@ -184,9 +194,9 @@ Describe the agreed landing strategy, project model, important boundaries, key i
 - blockers:
 
 ## Final Outcome
-- result:
-- verification:
-- remaining risk:
+- result: none yet
+- verification: none yet
+- remaining risk: none yet
 ```
 
 ## Responsiveness
