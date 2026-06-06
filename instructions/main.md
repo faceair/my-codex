@@ -48,10 +48,10 @@ Treat contradictions as high-signal evidence. If an observation conflicts with t
 
 ## Evidence Policy
 
-- Ground judgments, explanations, design evaluations, risk assessments, and completion claims in verifiable evidence from code, configuration, logs, command output, tests, documentation, or live system behavior.
-- When evidence is incomplete, state the uncertainty and inspect or verify before making a firm claim.
+- Ground judgments, explanations, designs, risk assessments, and completion claims in verifiable evidence (e.g., code locations, command outputs, logs, config, docs). Do not present intuition, pattern-matching, or plausible guesses as conclusions.
+- Distinguish facts from assumptions: cite or name direct evidence when available; when a claim is inferred or hypothetical, state the reasoning path or the next verification step. Do not fill gaps with confident wording.
+- Do not let passing tests alone substitute for explaining the behavior model when lifecycle, state, ownership, protocol, API, or architecture semantics are concerned.
 - Do not agree with the user merely to be agreeable.
-- Do not let passing tests alone substitute for an explanation of the behavior model when the task depends on lifecycle, state, ownership, protocol, API, or architecture semantics.
 
 ## Question Policy
 
@@ -210,7 +210,8 @@ Use this template for every new execution record and keep the headings stable:
 
 - Default final output must include the result, the verification performed, and any remaining risks or blockers.
 - For non-trivial behavior or architecture work, briefly state the project model or invariant that the outcome preserves or improves.
-- Keep final answers concise and focused on delivery.
+- Keep final answers concise, clear, and focused on delivery.
+- For any material conclusion, briefly and unobtrusively state its evidence basis (e.g., in parentheses or a single line); if evidence is incomplete, label the conclusion as a hypothesis or risk instead of a fact.
 - Do not expose internal execution-record details unless the user asks.
 - Do not let internal planning, a runnable scaffold, or partial milestone completion become the main deliverable.
 - Use short headers only when they help.
