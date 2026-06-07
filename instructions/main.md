@@ -64,11 +64,21 @@ Treat contradictions as high-signal evidence. If an observation conflicts with t
 
 ## Reviewer Policy
 
-- Reviewer is an independent technical partner for plan review, code review, project-model review, and uncertainty resolution. Reviewer consultation does not replace execution ownership; the primary agent remains responsible for final decisions, implementation, verification, and delivery.
-- Every non-trivial execution plan must be reviewed before implementation starts. If the plan changes materially, get reviewer review again before implementing the changed plan. Treat review as a required execution step, not as a reason to stop at the plan.
-- Every completed code change must be reviewed before final delivery. With milestone-based work, review after each implementation milestone; without milestones, review after all code changes are complete.
-- Consult reviewer as soon as meaningful uncertainty appears, including unclear requirements, weak evidence, important trade-offs, high-risk changes, repeated failures, conflicts between observations and the current hypothesis, or concern that the local solution may harm the project model.
-- Use reviewer consultation to reach consensus. If consensus cannot be reached quickly, the primary agent remains the decision owner: proceed only when the decision is low-risk and reversible; otherwise pause and ask the user. Record unresolved disagreement, decision owner, and remaining risk in the task execution record when one exists.
+- Reviewer is an independent technical partner for high-value plan review, code review, project-model review, and uncertainty resolution. Reviewer consultation does not replace execution ownership; the primary agent remains responsible for final decisions, implementation, verification, and delivery.
+- Default to not consulting reviewer for low-risk work: mechanical edits, documentation wording, formatting, local scripts, small reversible config changes, obvious test updates, or local implementation fixes whose behavior impact is narrow and locally verifiable. Implement, verify, and deliver these directly.
+- Consult reviewer before implementation and before final delivery when any of these risk triggers apply:
+  - the task changes shared API contracts, public interfaces, cross-subsystem boundaries, network protocols, core state machines, or architecture ownership;
+  - the task affects lifecycle, concurrency, locking, background routines, resource cleanup, retries, fallbacks, persistence, schema, or data-integrity semantics;
+  - the task touches production-critical paths, routing logic, database operations, security, credentials, privacy, or performance-sensitive boundaries;
+  - the change introduces a new abstraction, state, flag, special case, retry, fallback, or recovery path whose ownership or invariant is not already clear;
+  - requirements, acceptance criteria, ownership boundaries, evidence, or trade-offs are materially unclear;
+  - observations contradict the current hypothesis, or the same approach fails repeatedly;
+  - confidence remains below high after local discovery and targeted verification;
+  - the user explicitly asks for reviewer input;
+  - an open-ended investigation/refactor needs a continuation decision.
+- When consulting reviewer for the same top-level objective, active execution record, or contiguous topic, prefer reusing an already-open reviewer agent instead of spawning a new reviewer. Send the latest evidence, diff, decisions, and changed assumptions into that reviewer thread so the reviewer can build on prior context. Spawn a new reviewer only when no suitable reviewer agent is available, the prior reviewer context is materially stale or misleading, or a fresh independent review is intentionally needed.
+- If skipping reviewer on a non-trivial task, briefly self-check why the work is low-risk, reversible, and locally verifiable. Do not use reviewer consultation to avoid making a reasonable low-risk decision.
+- If consensus with reviewer cannot be reached quickly, the primary agent remains the decision owner. Proceed only when the decision is low-risk and reversible; otherwise pause and ask the user. Record unresolved disagreement, decision owner, and remaining risk in the task execution record when one exists.
 
 ## Open-Ended Reviewer Loop
 
