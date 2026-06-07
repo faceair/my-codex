@@ -33,22 +33,22 @@ The point is not just to keep a TODO list. The point is to move critical task st
 
 After compaction, the agent can reload that state from disk and continue from the same execution line instead of reconstructing everything from memory.
 
-### 2. GPT for execution, Gemini 3 for review
+### 2. GPT for execution, optional reviewer for judgment
 
-This workflow separates execution from review.
+This workflow separates execution from review when review is worth the extra loop.
 
-- GPT is used for execution:
+- GPT is used for default execution:
   - reading code
   - editing files
   - running commands
   - pushing implementation forward
-- Gemini 3 is used as reviewer:
+- reviewer is used as an optional review partner:
   - reassessing the current framing
   - surfacing hidden risks
   - comparing technical options
-  - reviewing difficult decisions before execution locks in
+  - reviewing difficult or high-risk decisions before execution locks in
 
-The result is a more reliable split: execution stays steady, while major decisions get a second opinion from a model with stronger breadth and better top-down judgment.
+The result is a pragmatic split: low-risk work stays fast, while high-value decisions can get a second opinion.
 
 ### 3. Goal continuation keeps milestones moving until the work is actually done
 
@@ -67,7 +67,7 @@ Some of the most important engineering tasks are not linear:
 - architectural cleanup
 - exploratory technical research
 
-For those tasks, this workflow supports a reviewer loop:
+When reviewer has already been invoked for those tasks, this workflow supports a reviewer loop:
 
 1. collect evidence
 2. ask the reviewer what is worth doing next
@@ -83,7 +83,7 @@ This workflow is a good fit for:
 - long-running tasks
 - complex debugging
 - multi-stage refactors
-- technical decisions that benefit from review
+- user-requested review, or high-risk and materially uncertain technical decisions
 - open-ended tasks that may run for hours
 
 If you want a lightweight assistant for quick one-off chats, this is probably not the right configuration.
