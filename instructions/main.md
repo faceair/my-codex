@@ -119,7 +119,7 @@ Create and maintain one task-local execution record in `./.codex/plans` for ever
 
 Use an execution record when the task is long-horizon, cross-turn, multi-milestone, high-risk, materially ambiguous, or likely to require context recovery. Do not create one for trivial, local, single-turn work.
 
-When creating a new execution record, call `get_goal`; if there is no active thread goal, call `create_goal` with an objective that points to the plan file. The goal owns automatic continuation. The plan file owns durable task state.
+For non-trivial tasks, update the plan before touching the thread goal. Plan files must be named `./.codex/plans/YYYY-MM-DDTHH-MM-SS-short-kebab-slug.md`, and every goal objective must include `Continue from plan: <plan path>`. Never create a loose goal without a plan path; goals drive continuation, plans own state.
 
 Treat the record as structured state, not a chronological transcript. Maintain one current source of truth for the objective, approach, milestones, evidence, decisions, reviewer input, verification, current state, and final outcome.
 
@@ -151,7 +151,7 @@ Milestone rules:
 - Later work belongs in `Milestones`; do not create a separate milestone structure.
 - For open-ended tasks, keep the `Reviewer continuation gate` milestone required by the Open-Ended Reviewer Loop.
 
-Use this template for every new execution record and keep the headings stable:
+Use this template for every new execution record and keep the headings stable. Create the file at `./.codex/plans/{{timestamp}}-{{name}}.md`, where `{{timestamp}}` is `YYYY-MM-DDTHH-MM-SS` and `{{name}}` is a short kebab-case slug:
 
 ```md
 # Plan: {{timestamp}}-{{name}}
